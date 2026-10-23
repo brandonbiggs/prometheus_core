@@ -18,24 +18,27 @@ backend/
     config.py        # pydantic-settings loader
     config.yml       # default configuration
     routers/
-      health.py      # GET /healthz
+      health.py      # GET /healthz (liveness), GET /readyz (readiness)
   tests/
 ```
 
 ## Development
 
-Requires Python 3.12+ and `uv` (the platform base image ships 3.12; the app also runs on 3.13).
+Requires Python 3.12+ and `uv` (the backend image is built on Python 3.12; the app also runs on 3.13).
 
 ```bash
 uv sync
 uv run alembic upgrade head          # once, and after pulling a new migration
 uv run uvicorn app.main:app --port 8600
-curl localhost:8600/healthz          # {"status":"ok"}
+curl localhost:8600/healthz          # {"status":"ok"}  (liveness: no dependencies)
+curl localhost:8600/readyz           # 200 if Valkey + admin-db answer, else 503
 
 uv run ruff check
 uv run mypy app/
-uv run pytest
+uv run pytest --cov
 ```
+
+CI fails if coverage drops below `fail_under` in `[tool.coverage.report]`, the lowest total across the supported Python versions. Raise it as coverage improves; never lower it. Running a subset of tests with `--cov` will fail the floor, so leave `--cov` off for targeted runs.
 
 The `alembic upgrade head` step is **not optional locally**: the app used to migrate
 itself from its lifespan, and no longer does (see *Multi-worker* below). Skipping it

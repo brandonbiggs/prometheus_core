@@ -41,7 +41,7 @@ from app.crypto import encrypt
 from app.db import get_db_session
 from app.db.models import SigningKey
 from app.security import require_admin
-from app.signing_keys import generate_signing_key, invalidate_active_key_cache
+from app.signing_keys import invalidate_active_key_cache, new_signing_key_row
 
 router = APIRouter(
     prefix="/api/admin/signing-keys",
@@ -87,13 +87,7 @@ async def list_keys(db: AsyncSession = Depends(get_db_session)) -> list[SigningK
 @router.post("", response_model=SigningKeyOut, status_code=status.HTTP_201_CREATED, responses=ENCRYPTION_RESPONSES)
 async def create_key(db: AsyncSession = Depends(get_db_session)) -> SigningKeyOut:
     """Generate a new RS256 keypair. Does not activate it -- see .../activate."""
-    kid, private_pem, public_pem = generate_signing_key()
-    row = SigningKey(
-        kid=kid,
-        private_key_encrypted=encrypt(private_pem),
-        public_key_pem=public_pem,
-        is_active=False,
-    )
+    row = new_signing_key_row(is_active=False)
     db.add(row)
     await db.commit()
     return _out(row)

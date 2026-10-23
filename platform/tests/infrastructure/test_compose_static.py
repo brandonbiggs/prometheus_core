@@ -38,9 +38,7 @@ def test_compose_has_services_key(compose_data):
 def test_infrastructure_services_defined(compose_data, infrastructure_services):
     """All five infrastructure services exist under 'services'."""
     defined = set(compose_data["services"].keys())
-    assert infrastructure_services.issubset(defined), (
-        f"Missing services: {infrastructure_services - defined}"
-    )
+    assert infrastructure_services.issubset(defined), f"Missing services: {infrastructure_services - defined}"
 
 
 def test_no_specialist_agents_in_base_compose(compose_data):
@@ -53,9 +51,7 @@ def test_no_specialist_agents_in_base_compose(compose_data):
 def test_each_service_has_image_or_build(compose_data, infrastructure_services):
     for svc_name in infrastructure_services:
         svc = compose_data["services"][svc_name]
-        assert "image" in svc or "build" in svc, (
-            f"Service '{svc_name}' has neither 'image' nor 'build'"
-        )
+        assert "image" in svc or "build" in svc, f"Service '{svc_name}' has neither 'image' nor 'build'"
 
 
 def test_postgres_image_version(compose_data):
@@ -100,9 +96,7 @@ def test_client_agent_port_is_published_only_by_system_test_override(
 
     override_path = project_root / "docker-compose.system-test.yml"
     override = yaml.safe_load(override_path.read_text(encoding="utf-8"))
-    assert override["services"]["client-agent"]["ports"] == [
-        "${CLIENT_AGENT_PORT:-8001}:8000"
-    ]
+    assert override["services"]["client-agent"]["ports"] == ["${CLIENT_AGENT_PORT:-8001}:8000"]
 
 
 def test_system_test_target_does_not_start_or_reconfigure_docker(project_root):
@@ -128,3 +122,21 @@ def test_compose_has_volumes_section(compose_data):
     volumes = compose_data.get("volumes", {})
     assert "valkey-data" in volumes, "Missing 'valkey-data' named volume"
     assert "litellm-db-data" in volumes, "Missing 'litellm-db-data' named volume"
+
+
+def test_every_agent_sets_external_agent_url(project_root, compose_data):
+    """Each agent registers http://<service-name>:8000, not a hostname-derived URL.
+
+    PrometheusAgent's hostname fallback only works under Compose (hostname ==
+    service name); on Kubernetes the hostname is the pod name, which isn't routable.
+    """
+    services = {"client-agent": compose_data["services"]["client-agent"]}
+    for path in project_root.glob("agents/**/docker-compose.yml"):
+        services.update(yaml.safe_load(path.read_text())["services"])
+
+    wrong = {
+        name: svc.get("environment", {}).get("EXTERNAL_AGENT_URL")
+        for name, svc in services.items()
+        if svc.get("environment", {}).get("EXTERNAL_AGENT_URL") != f"http://{name}:8000"
+    }
+    assert not wrong, f"EXTERNAL_AGENT_URL missing or not http://<service>:8000: {wrong}"

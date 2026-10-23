@@ -19,14 +19,15 @@ future OIDC provider).
 
 Signing is RS256 only. Key source, in priority order:
 
-1. **admin-db's active** ``SigningKey`` row (``app/signing_keys.py``) — once an
-   admin generates and activates a key through the admin API, Postgres is
-   authoritative. Cached in-process for ``_CACHE_TTL_SECONDS`` to avoid a DB
+1. **admin-db's active** ``SigningKey`` row (``app/signing_keys.py``) — the
+   backend creates and activates one key at first start
+   (``ensure_active_signing_key()``) unless ``USER_IDENTITY_PRIVATE_KEY`` is
+   set; admins rotate it through the admin API. Cached in-process for ``_CACHE_TTL_SECONDS`` to avoid a DB
    round-trip on every turn; ``app/routers/admin_keys.py`` invalidates the
    cache immediately after activate/retire so rotation doesn't wait it out.
-2. **``USER_IDENTITY_PRIVATE_KEY`` env var** — bootstrap fallback for
-   zero-admin-db-key deployments (e.g. before any key has ever been
-   generated, or a deploy that intentionally never uses the admin UI for this).
+2. **``USER_IDENTITY_PRIVATE_KEY`` env var** — the static-key alternative, for
+   a deploy that manages its own key outside admin-db. While it is set, the
+   backend creates no key at startup.
 
 Either way, every agent verifies with ``USER_IDENTITY_PUBLIC_KEY`` or a
 ``JWKS_URL`` pointed at this backend's own ``GET /.well-known/jwks.json``
@@ -133,7 +134,9 @@ async def mint_for_user(user_id: str) -> Optional[str]:
         from prometheus_api.agent.identity import mint_user_token
 
         ttl = int(os.environ.get("USER_IDENTITY_TTL", "7200"))
-        return mint_user_token(user_id, ttl_seconds=ttl)
+        # prometheus_api ships no py.typed, so mypy sees this call as Any
+        token: str = mint_user_token(user_id, ttl_seconds=ttl)
+        return token
     except Exception as exc:
         logger.warning("Failed to mint user token for %r: %s", user_id, exc)
         return None

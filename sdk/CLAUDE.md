@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **`prometheus_api.storage_client`** — Pydantic-typed sync (`StorageClient`) and async (`AsyncStorageClient`) HTTP clients for items, files (incl. chunked uploads), relationships, search, tags, timeseries. Also registers a `deeplynx://` fsspec filesystem (`DeepLynxFileSystem`) via the `fsspec.specs` entry point.
 2. **`prometheus_api.agent`** — `PrometheusAgent` base class for A2A-protocol agents (built on `a2a-sdk` + Starlette/uvicorn). Subclasses override `async _execute(params, context, event_queue)` and the base handles agent-card loading, bearer-token auth, registry registration, status/artifact emission, and per-`contextId` state persistence.
-3. **`prometheus_api.llm_client`** — provider-agnostic sync (`LLMClient`) and async (`AsyncLLMClient`) chat/embedding clients over LiteLLM. Agent code selects a *semantic flavor* (`default`, `small`, `medium`, `large`, `vision`, `embedding`); deployments map flavors to provider models in the installed YAML profiles under `llm_configs/`. Also owns tool calling (`llm_client/tools.py`), secret redaction, A2A `llm_api_key` extraction, and opt-in MLflow tracing.
+3. **`prometheus_api.llm_client`** — provider-agnostic sync (`LLMClient`) and async (`AsyncLLMClient`) chat/embedding clients over LiteLLM. Agent code selects a *semantic flavor* (`default`, `small`, `medium`, `large`, `vision`, `embedding`); deployments map flavors to provider models in the installed YAML profiles under `llm_configs/`. Also owns tool calling (`llm_client/tools.py`), secret redaction, and opt-in MLflow tracing. LLM credentials come only from `LLMConfig`/the environment, never from A2A requests.
 
 `prometheus_api.contract` (package top level, importable with only pydantic — no agent runtime) holds the canonical frontend ↔ client-agent wire contract (`ConversationRequest`, `ConversationResponse`, `ConversationStatus`) — the JSON payload exchanged in A2A text parts. The Prometheus platform's frontend and client-agent must import these models rather than redefining them; change them here and the change propagates to both sides. They are also re-exported from `prometheus_api.agent`.
 
@@ -29,9 +29,9 @@ make lint             # ruff check .
 make format           # ruff format --check .
 make typecheck        # mypy prometheus_api/
 make test             # alias for `test-unit` (skips integration)
-make test-unit        # pytest -m "not integration"
+make test-unit        # pytest -m "not integration" --cov (enforces the coverage floor)
 make test-integration # pytest -m integration (requires .env)
-make test-all         # pytest (every marker, including integration)
+make test-all         # pytest --cov (every marker, including integration)
 make fix              # ruff check --fix . && ruff format .
 make check            # lint + format + typecheck
 make hooks            # install pre-commit + pre-push hooks
@@ -46,8 +46,10 @@ make test-install     # build wheel via `uv build`, install in clean venv, smoke
 uv run pytest -m "not integration"                          # unit only (no .env required)
 uv run pytest -m integration                                # integration (requires .env w/ DeepLynx creds)
 uv run pytest tests/test_agent.py::TestPrometheusAgentExecutor::test_execute_calls_enqueue_event
-uv run pytest --cov=prometheus_api --cov-report=html
+uv run pytest --cov --cov-report=html
 ```
+
+`make test`, `make test-all`, and CI fail if coverage drops below `fail_under` in `[tool.coverage.report]`, the lowest total across the supported Python versions. Raise it as coverage improves; never lower it. Running a subset of tests with `--cov` will fail the floor, so leave `--cov` off for targeted runs.
 
 `pyproject.toml` sets `asyncio_mode = "auto"`, so async tests do **not** need `@pytest.mark.asyncio`. Tests in `test_integration.py` are auto-marked `integration` by `tests/conftest.py`.
 
@@ -103,7 +105,7 @@ Streaming is not supported: a truthy `stream` raises `LLMClientError` before any
 ### Tests
 - `test_*.py` files at the top level of `tests/` are unit tests.
 - `test_integration.py` requires a `.env` with valid `DEEPLYNX_KEY`/`SECRET`/`ORG_ID`/`PROJECT_ID` and optionally `DEEPLYNX_DATA_SOURCE_ID` (without it, code that creates records will hit "DataSource with id 0 not found").
-- `make test-install` builds a wheel, installs it into a clean venv, and smoke-tests the imports. Use this rather than ad-hoc shell scripts.
+- `make test-install` builds a wheel, installs it into a clean venv, and imports every package under `prometheus_api/` from it (`python -I`, so the source tree can't stand in). It fails if a package is missing from `[tool.setuptools] packages`. CI runs it as the `sdk: install` job. Use this rather than ad-hoc shell scripts.
 
 ### Specs (spec-driven development)
 

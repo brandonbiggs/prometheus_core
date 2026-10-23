@@ -9,12 +9,15 @@ services:
         - HTTPS_PROXY=${HTTPS_PROXY:-}
         - NO_PROXY=${NO_PROXY:-}
     container_name: artifact-debug-agent
+    extra_hosts:
+      - "prometheus.host.internal:host-gateway"
     ports:
       - "${ARTIFACT_DEBUG_PORT:-8008}:8000"
     networks:
       - agent-network
     environment:
       AGENT_PORT: 8000
+      EXTERNAL_AGENT_URL: http://artifact-debug-agent:8000
       AGENT_SECRET: ${AGENT_SECRET}
       REGISTRY_URL: ${REGISTRY_URL:-http://litellm:4000}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
@@ -41,4 +44,12 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
+    # /healthz is served by the PrometheusAgent base class once uvicorn is up.
+    # It does not cover LiteLLM registration, which retries in the background.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped

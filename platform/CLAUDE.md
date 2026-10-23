@@ -13,7 +13,7 @@ The `frontend/` is a Node/TypeScript app (React + Vite). The `backend/` runs Pyt
 The frontend is a standalone FastAPI **`backend/`** service (its own JSON/SSE contract) plus an in-house React app in **`frontend/`** (React + Vite) whose element/viewer plumbing lives in `frontend/src/lib/elements/`.
 
 - Design: `plan.md` (reconstructed brief + ordered work plan) and `backend/CONTRACT.md` (frozen wire contract).
-- Ordered steps + live status: `tasks/README.md` — steps 00–09 done (skeleton, contract, auth/sessions, lifted utils, chat turn, SSE events, uploads, artifacts content proxy + `render_hint`, conversation history, docker/compose/nginx); only 10 (end-to-end verify) still pending. The `backend` service is in the root `docker-compose.yml` (host port 8600 → container 8000), built from the prometheus_api base image; it comes up with `make up` regardless of `PROFILE`.
+- Ordered steps + live status: `tasks/README.md` — steps 00–09 done (skeleton, contract, auth/sessions, lifted utils, chat turn, SSE events, uploads, artifacts content proxy + `render_hint`, conversation history, docker/compose/nginx); only 10 (end-to-end verify) still pending. The `backend` service is in the root `docker-compose.yml` (host port 8600 → container 8000), built from `backend/Dockerfile` on a pinned uv/Python image, with `prometheus_api` installed from the checked-out `../sdk` via the `sdk` and `certs` named build contexts (not FROM the prometheus_api base image, so `PROMETHEUS_API_BASE_IMAGE_*` and `LOCAL_SDK` don't affect it); it comes up with `make up` regardless of `PROFILE`.
 - `backend/` is `uv`-managed Python 3.13: `uv run pytest`, `uv run ruff check`, `uv run mypy app/` (see `backend/README.md`). The backend owns its own contract in `app/contract.py` — do not couple it to `prometheus_api` base-image types on the wire. It no longer migrates itself at startup, so a local run needs an explicit `uv run alembic upgrade head` first.
 - **The backend holds no per-session state in memory.** Sessions (`session:{sid}`), logout markers (`revoked:sid:{sid}`) and the SSE event bus (pub/sub on `sse:{sid}`) are all in Valkey, so a restart no longer forks conversations and `BACKEND_WORKERS` > 1 is valid — default 1; see the *Multi-worker* section of `backend/README.md`. `SessionState` is a **frozen snapshot**: change session state through a `SessionStore` coroutine, never by assigning to a field.
 
@@ -35,7 +35,11 @@ make clean-generated # delete the generated agents compose file
 make test-static       # infra tests that don't need Docker
 make test-integration  # infra tests against running containers
 make test-infra        # both
+
+make check           # wait until the running platform answers on its host ports and every agent is registered
 ```
+
+`make up` (and `restart`, `ng-up`, `ng-restart`) runs `docker compose up --wait` and then `make check` (`scripts/check_platform.py`), so it returns only once every healthcheck passes, the backend and frontend answer on their host ports, and every agent is registered with LiteLLM. `CHECK=false` skips both. CI's `platform: up` job runs `make up`, so a service that never goes healthy or an agent that never registers fails the build.
 
 Launch and restart targets clear LiteLLM's Postgres volume before starting services so stale agent registrations do not survive across platform launches. Valkey state is left intact.
 
@@ -109,7 +113,7 @@ The React viewers live in `frontend/src/viewers/` (`mesh/MeshViewer` for Exodus/
 
 ### Shared protocol types
 
-Two contracts sit back to back. The **React frontend ↔ backend** wire contract (JSON/SSE) is owned by the backend: frozen in `backend/CONTRACT.md`, typed in `backend/app/contract.py`, and mirrored in TypeScript under `frontend/src/lib/` (see `frontend/AGENT-CONTRACT.md`) — deliberately decoupled from the base-image types. The **backend ↔ client-agent** contract (`ConversationRequest`, `ConversationResponse`, `ConversationStatus`) lives in `prometheus_api.contract` (available in every Python container via the base image); the client-agent re-exports it from `orchestrator/models.py` — change it in `prometheus_api`, not here. The raw A2A wire types (messages, parts, tasks) come from the `a2a-sdk`. There is no longer a `shared/` bind mount: every service runs from its image, so the only runtime host mounts left are `litellm_config.yaml` (config) and `./frontend` on the `dev`-profile Vite container (HMR).
+Two contracts sit back to back. The **React frontend ↔ backend** wire contract (JSON/SSE) is owned by the backend: frozen in `backend/CONTRACT.md`, typed in `backend/app/contract.py`, and mirrored in TypeScript under `frontend/src/lib/` (see `frontend/AGENT-CONTRACT.md`) — deliberately decoupled from the base-image types. The **backend ↔ client-agent** contract (`ConversationRequest`, `ConversationResponse`, `ConversationStatus`) lives in `prometheus_api.contract` (available in every Python container via the base image, and installed from `../sdk` in the backend image); the client-agent re-exports it from `orchestrator/models.py` — change it in `prometheus_api`, not here. The raw A2A wire types (messages, parts, tasks) come from the `a2a-sdk`. There is no longer a `shared/` bind mount: every service runs from its image, so the only runtime host mounts left are `litellm_config.yaml` (config) and `./frontend` on the `dev`-profile Vite container (HMR).
 
 ## Configuration & secrets
 
@@ -137,6 +141,7 @@ All services share the `agent-network` bridge.
 ## Conventions worth knowing
 
 - **Don't edit `docker-compose.agents.yml`** — it's regenerated by `make generate` from the per-agent compose files. Edit the per-agent file instead, then re-run.
+- **Every agent's compose service needs a healthcheck** probing the base class's health endpoint on the container port (`/healthz`) (copy the block from any existing agent or `agent-template/`). `tests/infrastructure/test_healthchecks.py` enforces it, and `make up` waits on it. The health endpoint does not reflect LiteLLM registration — that's what `make check` checks.
 - The React `frontend/` uses **ESLint + TypeScript** (`npm run lint`, `npm run typecheck`). The Python `backend/` and agents use **Ruff** + **mypy** (`uv run ruff check`, `uv run mypy app/`). Match the toolchain of whichever tree you touch.
 - Tests are split: `tests/` (infra/integration of the whole stack), `backend/tests/` (backend units + contract), `frontend/src/**/*.test.ts` (React unit tests), `agents/<name>/tests/` (per-agent unit tests). The infra suite uses the `integration` pytest marker for tests that need running containers.
 - Agents choose semantic model flavors in code; deployment configuration must not override that choice.
@@ -151,7 +156,7 @@ All services share the `agent-network` bridge.
 - `docs/docs/dev-docs/multi-user-setup.md` — multi-user configuration, credential broker, isolation (operator + developer guide)
 - `docs/docs/dev-docs/encryption-and-keys.md` — every secret and key in the platform, what protects what, and what breaks if one is lost or rotated
 
-## Further reading (prometheus_api repo)
+## Further reading (SDK, `../sdk`)
 
-- `prometheus_api/docs/agent/MULTI_USER.md` — identity JWT flow, credential broker backends, per-user worker pool, conversation ownership (agent author reference)
-- `prometheus_api/docs/agent/IDENTITY_KEY_MANAGEMENT.md` — RS256 key generation and distribution per service, third-party agent integration via JWKS, rotation (agent author reference; no HS256 option exists)
+- `../sdk/docs/agent/MULTI_USER.md` — identity JWT flow, credential broker backends, per-user worker pool, conversation ownership (agent author reference)
+- `../sdk/docs/agent/IDENTITY_KEY_MANAGEMENT.md` — RS256 key generation and distribution per service, third-party agent integration via JWKS, rotation (agent author reference; no HS256 option exists)

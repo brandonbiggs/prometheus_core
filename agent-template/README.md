@@ -1,6 +1,6 @@
 # Prometheus Agent Template
 
-A template for building specialist agents for the [Prometheus](https://github.inl.gov/genesis/prometheus_platform)
+A template for building specialist agents for the [Prometheus](https://github.com/idaholab/prometheus_core)
 multi-agent platform (it lives in the `agent-template/` directory of that
 monorepo). Agents speak the Agent-to-Agent (A2A) protocol; the
 platform's orchestrator discovers them, routes user requests to them, and renders
@@ -35,10 +35,11 @@ dependencies — builds are small and fast.
 ### Scaffold a new agent
 
 ```bash
-git clone git@github.inl.gov:genesis/prometheus_platform.git
-cd prometheus_platform/agent-template
+git clone git@github.com:idaholab/prometheus_core.git
+cd prometheus_core/agent-template
 python setup_agent.py                        # prompts for everything
 python setup_agent.py "Plant Analysis" ../plant-agent   # name and output dir given
+python setup_agent.py --yes "Plant Analysis" ../plant-agent   # every other value defaulted, no prompts
 python setup_agent.py --env-only ../plant-agent         # only the .env, for an agent you cloned
 ```
 
@@ -78,9 +79,9 @@ cp .env.example .env          # fill in real values
 # Local (fast iteration):
 uv sync && source .venv/bin/activate
 # Pin prometheus_api to the platform's base image hash (see .env):
-uv pip install "git+ssh://git@github.inl.gov/genesis/prometheus_platform.git@3407a82#subdirectory=sdk"
+uv pip install "git+ssh://git@github.com/idaholab/prometheus_core.git@3407a82#subdirectory=sdk"
 # or https
-uv pip install "git+https://github.inl.gov/genesis/prometheus_platform.git@3407a82#subdirectory=sdk"
+uv pip install "git+https://github.com/idaholab/prometheus_core.git@3407a82#subdirectory=sdk"
 AGENT_SECRET_REQUIRED=false python agent.py
 
 # Tests / lint:
@@ -96,7 +97,7 @@ make up-fg
 EXTERNAL_AGENT_HOST=localhost EXTERNAL_AGENT_PORT=8000 make up-fg
 
 # Platform integration through a host-published port:
-EXTERNAL_AGENT_HOST=host.docker.internal EXTERNAL_AGENT_PORT=8042 make up
+EXTERNAL_AGENT_HOST=prometheus.host.internal EXTERNAL_AGENT_PORT=8042 make up
 ```
 
 Plain `make up` / `make up-fg` defaults to the platform Docker network. If the
@@ -105,9 +106,9 @@ the agent port will not be published to the host. Use external mode with
 `EXTERNAL_AGENT_HOST=localhost EXTERNAL_AGENT_PORT=8000` when you only want to
 start one agent container and test it from your host with `curl`.
 
-For external mode, `host.docker.internal` is Docker's hostname for the host
-machine from inside a container. Docker Desktop provides it automatically; on
-Linux the template includes a small Compose override for the same mapping.
+For external mode, `prometheus.host.internal` is the hostname for the host
+machine from inside a container. Every platform and agent compose service maps
+it to Docker's host gateway, on macOS and Linux alike.
 
 See the generated `README.md` in your agent directory, and
 [`TUTORIAL.md`](TUTORIAL.md) for the full walkthrough — agent card design,
@@ -125,19 +126,20 @@ make fix        # auto-fix lint + format
 make test       # pytest
 ```
 
+CI runs `pytest --cov` and fails if coverage drops below `fail_under` in `[tool.coverage.report]`, the lowest total across the supported Python versions. Raise it as coverage improves; never lower it. Running a subset of tests with `--cov` will fail the floor, so leave `--cov` off for targeted runs.
+
 ## Further reading
 
-These live in the SDK ([`sdk/`](https://github.inl.gov/genesis/prometheus_platform/tree/dev/sdk)) directory of the monorepo:
+These live in the SDK ([`sdk/`](https://github.com/idaholab/prometheus_core/tree/devel/sdk)) directory of the monorepo:
 
 | Document | Description |
 |----------|-------------|
-| [PrometheusAgent Guide](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/agent/GUIDE.md) | Full API reference, pitfalls, lifecycle hooks |
-| [PrometheusAgent Quick Start](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/agent/QUICK_START.md) | Condensed recipes for every helper |
-| [Environment Setup](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/ENV_SETUP.md) | All environment variables for agents and storage |
-| [StorageClient Guide](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/storage-client/GUIDE.md) | Reading and writing to DeepLynx |
-| [HPC Notes](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/hpc.md) | Running on INL HPC with Podman |
-| [Multi-User Identity & Credentials](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/agent/MULTI_USER.md) | Verifying which platform user is calling your agent, per-user credentials |
-| [Identity Key Management](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/agent/IDENTITY_KEY_MANAGEMENT.md) | RS256 keys, `prometheus-identity-keygen`, JWKS for third-party agents (this template) |
+| [PrometheusAgent Guide](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/agent/GUIDE.md) | Full API reference, pitfalls, lifecycle hooks |
+| [PrometheusAgent Quick Start](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/agent/QUICK_START.md) | Condensed recipes for every helper |
+| [Environment Setup](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/ENV_SETUP.md) | All environment variables for agents and storage |
+| [StorageClient Guide](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/storage-client/GUIDE.md) | Reading and writing to DeepLynx |
+| [Multi-User Identity & Credentials](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/agent/MULTI_USER.md) | Verifying which platform user is calling your agent, per-user credentials |
+| [Identity Key Management](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/agent/IDENTITY_KEY_MANAGEMENT.md) | RS256 keys, `prometheus-identity-keygen`, JWKS for third-party agents (this template) |
 
 ## Support
 

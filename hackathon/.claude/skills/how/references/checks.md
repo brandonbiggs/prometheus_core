@@ -119,7 +119,7 @@ with StorageClient(cfg) as c:
     print("OK", cfg.base_url, len(c.items.list(page_size=5).items), "items")
 EOF
 ```
-- Expect `OK <base URL> <n> items`. Failure: `AuthenticationError`/401 (key and secret swapped or cut); connection refused to `host.docker.internal` (Linux `extra_hosts`; local DeepLynx stopped; AirPlay on :5000); `ValueError` (empty ids).
+- Expect `OK <base URL> <n> items`. Failure: `AuthenticationError`/401 (key and secret swapped or cut); connection refused to `prometheus.host.internal` (local DeepLynx stopped; host firewall; AirPlay on :5000); `ValueError` (empty ids).
 ### deeplynx-agent
 Tags: diagnose. Fix: yes. Run the `deeplynx-backend` command with `docker exec -i <container>`. Expect `OK` and the same base URL; a `deeplynx://` URI resolves only with the same org and project. Fix: `agent-env-sync`.
 
@@ -157,7 +157,7 @@ Tags: diagnose. Fix: yes. Run: `cd <agent> && ls *.py; grep -n '^COPY' Dockerfil
 ### card-in-image
 Tags: diagnose. Fix: safe. Run: `for f in agent_card.json agent.py; do docker exec <container> cat /app/$f | cmp -s - <agent>/$f && echo "$f same" || echo "$f differs"; done` Expect `same` twice. `differs`: an old image (`docker restart` keeps it). Fix: `make up` in the agent folder, then `discovery-refresh`.
 ### client-agent-reaches-agent
-Tags: diagnose. Fix: yes. Run: `docker exec client-agent python -c "import urllib.request as u; print(u.urlopen('<url>/health', timeout=5).read())"` (`<url>` from `registry-details`) Expect `b'{"ok":true,...}'`. A connection error: the LiteLLM card has no `inputSchema` (`tool_discovery.py:118-143`). Fix: the internal network mode (no `EXTERNAL_AGENT_*` lines), then `make up` (`run-and-register.md`).
+Tags: diagnose. Fix: yes. Run: `docker exec client-agent python -c "import urllib.request as u; print(u.urlopen('<url>/healthz', timeout=5).read())"` (`<url>` from `registry-details`) Expect `b'{"ok":true,...}'`. A connection error: the LiteLLM card has no `inputSchema` (`tool_discovery.py:118-143`). Fix: the internal network mode (no `EXTERNAL_AGENT_*` lines), then `make up` (`run-and-register.md`).
 
 ## Discovery
 

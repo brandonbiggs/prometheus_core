@@ -36,14 +36,14 @@ source .venv/bin/activate
 # Install prometheus_api pinned to the platform's base image hash
 # (PROMETHEUS_API_BASE_IMAGE_HASH in your .env) so local dev matches the
 # container. Re-run this when the platform bumps the hash.
-uv pip install "git+https://github.inl.gov/genesis/prometheus_platform.git@$(grep -E '^PROMETHEUS_API_BASE_IMAGE_HASH=' .env | cut -d= -f2)#subdirectory=sdk"
+uv pip install "git+https://github.com/idaholab/prometheus_core.git@$(grep -E '^PROMETHEUS_API_BASE_IMAGE_HASH=' .env | cut -d= -f2)#subdirectory=sdk"
 
 AGENT_SECRET_REQUIRED=false python agent.py
 ```
 
 If the target agent is running in Docker, start it in external network mode so
 `localhost:8000` reaches the container; see the
-[template README run instructions](https://github.inl.gov/genesis/prometheus_platform/blob/dev/agent-template/README.md#run-it).
+[template README run instructions](https://github.com/idaholab/prometheus_core/blob/devel/agent-template/README.md#run-it).
 
 The agent starts on `http://localhost:8000`. Test it:
 
@@ -92,8 +92,7 @@ make logs        # tail logs (add SERVICE=<name> for one service)
 make down        # stop and remove
 ```
 
-These wrap `docker compose` and, on Linux, layer in `docker-compose.linux.yml`
-only when external mode is selected.
+These wrap `docker compose` and layer in the network-mode override.
 
 By default, `make` includes `docker-compose.net_internal.yml`, so the agent joins
 the platform's Docker network. Start the platform first, then run `make up` or
@@ -105,10 +104,9 @@ To expose the agent port outside Docker instead, set both external mode variable
 EXTERNAL_AGENT_HOST=my-host.example.gov EXTERNAL_AGENT_PORT=8042 make up
 ```
 
-`host.docker.internal` is Docker's hostname for "the host machine from inside a
-container." Docker Desktop provides it automatically. On Linux, external mode
-also includes `docker-compose.linux.yml`, which maps that name to Docker's host
-gateway so the agent container can call host-published platform services.
+`prometheus.host.internal` is the hostname for "the host machine from inside a
+container." `docker-compose.yml` maps it to Docker's host gateway on every OS,
+so the agent container can call host-published platform services.
 
 If exactly one of `EXTERNAL_AGENT_HOST` or `EXTERNAL_AGENT_PORT` is set, `make`
 stops before running Compose.
@@ -167,7 +165,7 @@ If the platform is running in multi-user mode, every request carries a verified
 
 ```python
 async def _execute(self, params, context, event_queue):
-    user_id = params["user_id"]   # verified by the base class; never spoofable
+    user_id = params["user_id"]  # verified by the base class; never spoofable
 ```
 
 Signing is RS256 only, so this agent never needs (or should have) a private
@@ -178,7 +176,7 @@ automatically (a static `USER_IDENTITY_PUBLIC_KEY` needs manual updating after
 every rotation). Generate/inspect keys with `prometheus-identity-keygen`
 (ships in `prometheus_api`, already installed in this image) or `openssl`.
 See
-[TUTORIAL.md](https://github.inl.gov/genesis/prometheus_platform/blob/dev/agent-template/TUTORIAL.md#verifying-which-platform-user-is-calling-you-multi-user-identity)
+[TUTORIAL.md](https://github.com/idaholab/prometheus_core/blob/devel/agent-template/TUTORIAL.md#verifying-which-platform-user-is-calling-you-multi-user-identity)
 and
-[Identity Key Management](https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/docs/agent/IDENTITY_KEY_MANAGEMENT.md)
+[Identity Key Management](https://github.com/idaholab/prometheus_core/blob/devel/sdk/docs/agent/IDENTITY_KEY_MANAGEMENT.md)
 for the full picture.

@@ -35,6 +35,13 @@ x-common-env: &common-env
   # credential behavior; "vault" activates per-user Vault policies.
   CREDENTIAL_BROKER: ${CREDENTIAL_BROKER:-env}
 
+# Containers reach services on the Docker host (e.g. a local DeepLynx) as
+# prometheus.host.internal. A name of our own, rather than host.docker.internal,
+# works the same on Docker Desktop (which predefines host.docker.internal and
+# rejects re-adding it) and on Linux Engine (which does not define it).
+x-host-gateway: &host-gateway
+  - "prometheus.host.internal:host-gateway"
+
 x-build-args: &prometheus-api-build-args
   PROMETHEUS_API_BASE_IMAGE_REPO: ${PROMETHEUS_API_BASE_IMAGE_REPO:-containers.github.inl.gov/genesis/prometheus_api}
   PROMETHEUS_API_BASE_IMAGE_HASH: ${PROMETHEUS_API_BASE_IMAGE_HASH:-}
@@ -102,6 +109,7 @@ services:
   litellm:
     image: ghcr.io/berriai/litellm:v1.92.0
     container_name: litellm-proxy
+    extra_hosts: *host-gateway
     ports:
       - "${LITELLM_LOCAL_PORT}:4000"
     volumes:
@@ -148,11 +156,13 @@ services:
       args:
         <<: *prometheus-api-build-args
     container_name: client-agent
+    extra_hosts: *host-gateway
     networks:
       - agent-network
     environment:
       <<: *common-env
       AGENT_PORT: 8000
+      EXTERNAL_AGENT_URL: http://client-agent:8000
       LLM_CONFIG_PROFILE: ${LLM_CONFIG_PROFILE:-registry}
       LLM_CONFIG_FILE: ${LLM_CONFIG_FILE:-}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
@@ -163,6 +173,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    # /healthz is served by the PrometheusAgent base class once uvicorn is up.
+    # It does not cover LiteLLM registration, which retries in the background.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   # Standalone FastAPI backend (replaces Chainlit's server role; see backend/).
@@ -171,10 +189,18 @@ services:
   backend:
     build:
       context: ./backend
+      # Built from the checked-out SDK, not the prometheus_api base image.
+      additional_contexts:
+        sdk: ../sdk
+        certs: ../common/certs
       args:
-        <<: *prometheus-api-build-args
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
     container_name: backend
+    extra_hosts: *host-gateway
     ports:
+      # Keep the default in sync with BACKEND_PORT in the Makefile (make check)
       - "${BACKEND_PORT:-8600}:8000"
     networks:
       - agent-network
@@ -251,7 +277,9 @@ services:
       additional_contexts:
         certs: ../common/certs
     container_name: frontend-dev
+    extra_hosts: *host-gateway
     ports:
+      # Keep the default in sync with FRONTEND_DEV_PORT in the Makefile (make check)
       - "${FRONTEND_DEV_PORT:-5150}:5150"
     networks:
       - agent-network
@@ -264,6 +292,10 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    # Wait for a healthy backend: the first /api calls fail until it serves.
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend-prod:
@@ -275,11 +307,21 @@ services:
       additional_contexts:
         certs: ../common/certs
     container_name: frontend-prod
+    extra_hosts: *host-gateway
     ports:
+      # Keep the default in sync with FRONTEND_PROD_PORT in the Makefile (make check)
       - "${FRONTEND_PROD_PORT:-8080}:8080"
     networks:
       - agent-network
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
+    # Probes nginx's own /healthz, not /api/, so a slow backend doesn't mark the
+    # frontend unhealthy. nginx:alpine ships busybox wget, not python.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped

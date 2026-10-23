@@ -66,7 +66,7 @@ from a2a.types import (
     TaskStatus,
     TaskStatusUpdateEvent,
 )
-from .middleware import A2AContentSizeLimitMiddleware, BearerTokenMiddleware
+from .middleware import HEALTH_PATH, A2AContentSizeLimitMiddleware, BearerTokenMiddleware
 from .artifact_resolver import ArtifactResolver
 from .artifacts import ArtifactReference, ArtifactRegistry
 from .context_state import ContextStateStore
@@ -1010,14 +1010,14 @@ class PrometheusAgent:
         return provided
 
     def llm_client(self, context: RequestContext, **kwargs: Any) -> Any:
-        """Create an AsyncLLMClient that inherits this agent's name for tracing."""
+        """Create an AsyncLLMClient that inherits this agent's name for tracing.
+
+        Credentials come from ``config`` or the environment, never from the A2A
+        request.
+        """
         from ..llm_client import AsyncLLMClient
 
-        return AsyncLLMClient.from_a2a_context(
-            context,
-            app_name=self.agent_name,
-            **kwargs,
-        )
+        return AsyncLLMClient(app_name=self.agent_name, **kwargs)
 
     @staticmethod
     def pending_hint(
@@ -1520,7 +1520,8 @@ class PrometheusAgent:
         :meth:`PrometheusAgentExecutor._extract_identity` before ``_execute``
         is called.  Always returns ``None`` outside an active request context.
         """
-        return get_current_identity().user_id if get_current_identity() else None
+        identity = get_current_identity()
+        return identity.user_id if identity is not None else None
 
     def identity_metadata(self) -> Dict[str, str]:
         """Return A2A message metadata carrying the current user token.
@@ -1911,7 +1912,7 @@ class PrometheusAgent:
         """
         Optional hook to register additional routes or middleware on the Starlette app.
 
-        Override in subclasses that need custom HTTP endpoints beyond A2A + /health + /api/chat.
+        Override in subclasses that need custom HTTP endpoints beyond A2A + /healthz + /api/chat.
         Override `lifespan()` for startup/shutdown behavior.
         """
         return
@@ -2064,9 +2065,9 @@ class PrometheusAgent:
         ]
         app = Starlette(routes=routes, lifespan=app_lifespan)
 
-        # add health endpoint
+        # add health endpoint; /healthz matches the platform's other services
         app.add_route(
-            "/health",
+            HEALTH_PATH,
             lambda request: JSONResponse(
                 {
                     "ok": True,

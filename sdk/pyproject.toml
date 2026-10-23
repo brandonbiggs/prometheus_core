@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prometheus-api"
-version = "0.13.0"
+version = "0.14.0"
 description = "Storage client and agent utilities for building A2A multi-agent systems"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -49,9 +49,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.inl.gov/genesis/prometheus_platform/tree/dev/sdk"
-Repository = "https://github.inl.gov/genesis/prometheus_platform"
-Documentation = "https://github.inl.gov/genesis/prometheus_platform/blob/dev/sdk/README.md"
+Homepage = "https://github.com/idaholab/prometheus_core/tree/devel/sdk"
+Repository = "https://github.com/idaholab/prometheus_core"
+Documentation = "https://github.com/idaholab/prometheus_core/blob/devel/sdk/README.md"
 
 [project.entry-points."fsspec.specs"]
 deeplynx = "prometheus_api.storage_client.filesystem:DeepLynxFileSystem"
@@ -89,6 +89,16 @@ markers = [
     "integration: Integration tests requiring .env file and database connection",
     "slow: Slow running tests",
 ]
+
+[tool.coverage.run]
+source_pkgs = ["prometheus_api"]
+relative_files = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+# The lowest total across the supported Python versions; never lower it
+fail_under = 69.7
+precision = 2
 
 [tool.ruff]
 line-length = 100

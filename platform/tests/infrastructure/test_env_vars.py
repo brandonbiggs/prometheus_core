@@ -90,6 +90,7 @@ def test_init_env_fills_secrets_and_checks_llm_key(tmp_path, env_example_path, m
     monkeypatch.setattr(init_env, "EXAMPLE", example)
     monkeypatch.setattr(init_env, "ENV", env)
     monkeypatch.setattr(init_env, "interactive", lambda: False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
 
     assert init_env.main() == 1  # LLM_API_KEY still blank
     first = init_env.values(env.read_text())
@@ -103,6 +104,26 @@ def test_init_env_fills_secrets_and_checks_llm_key(tmp_path, env_example_path, m
     }, "existing values must never be overwritten"
 
 
+def test_init_env_takes_llm_key_from_environment(tmp_path, env_example_path, monkeypatch):
+    """CI sets LLM_API_KEY in the environment instead of answering the prompt."""
+    init_env = _load_init_env()
+    example = tmp_path / ".env.example"
+    example.write_text(env_example_path.read_text())
+    env = tmp_path / ".env"
+    monkeypatch.setattr(init_env, "EXAMPLE", example)
+    monkeypatch.setattr(init_env, "ENV", env)
+    monkeypatch.setattr(init_env, "interactive", lambda: False)
+    monkeypatch.setenv("LLM_API_KEY", "sk-from-env")
+
+    assert init_env.main() == 0
+    assert init_env.values(env.read_text())["LLM_API_KEY"] == "sk-from-env"
+
+    # A key already in .env wins over the environment
+    monkeypatch.setenv("LLM_API_KEY", "sk-other")
+    assert init_env.main() == 0
+    assert init_env.values(env.read_text())["LLM_API_KEY"] == "sk-from-env"
+
+
 def test_init_env_prompts_for_profile_and_key(tmp_path, env_example_path, monkeypatch):
     init_env = _load_init_env()
     example = tmp_path / ".env.example"
@@ -111,6 +132,7 @@ def test_init_env_prompts_for_profile_and_key(tmp_path, env_example_path, monkey
     monkeypatch.setattr(init_env, "EXAMPLE", example)
     monkeypatch.setattr(init_env, "ENV", env)
     monkeypatch.setattr(init_env, "interactive", lambda: True)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.setattr(init_env, "choose", lambda options, labels, default: "openai")
     monkeypatch.setattr(init_env.getpass, "getpass", lambda prompt: "sk-openai-x")
 
@@ -120,14 +142,42 @@ def test_init_env_prompts_for_profile_and_key(tmp_path, env_example_path, monkey
     assert written["LLM_API_KEY"] == "sk-openai-x"
 
 
+def test_init_env_rejects_unknown_profile(tmp_path, env_example_path, monkeypatch, capsys):
+    init_env = _load_init_env()
+    example = tmp_path / ".env.example"
+    example.write_text(env_example_path.read_text())
+    env = tmp_path / ".env"
+    env.write_text(
+        example.read_text()
+        .replace("LLM_CONFIG_PROFILE=registry\n", "LLM_CONFIG_PROFILE=genisis\n")
+        .replace("LLM_API_KEY=\n", "LLM_API_KEY=sk-x\n")
+    )
+    monkeypatch.setattr(init_env, "EXAMPLE", example)
+    monkeypatch.setattr(init_env, "ENV", env)
+    monkeypatch.setattr(init_env, "interactive", lambda: False)
+
+    assert init_env.main() == 1
+    err = capsys.readouterr().err
+    assert "LLM_CONFIG_PROFILE=genisis" in err
+    assert "registry" in err
+
+    env.write_text(env.read_text().replace("LLM_CONFIG_FILE=\n", "LLM_CONFIG_FILE=/custom.yaml\n"))
+    assert init_env.main() == 0  # a custom YAML replaces the profile
+
+
 def test_profiles_match_sdk_llm_configs():
-    """Every installed profile is offered, and all of them read LLM_API_KEY."""
+    """Every installed profile is offered; all but the keyless ollama read LLM_API_KEY."""
     init_env = _load_init_env()
     known = init_env.profiles()
     assert next(iter(known)) == "registry"
     assert sorted(known) == sorted(p.stem for p in init_env.LLM_CONFIGS.glob("*.yaml"))
     # registry via litellm_config.yaml; EMBEDDING_API_KEY is never the profile key.
-    assert {key for key, _ in known.values()} == {"LLM_API_KEY"}
+    # Only the keyless local ollama profile (api_key: none) needs no key at all.
+    keys = {name: key for name, (key, _) in known.items()}
+    assert [name for name, key in keys.items() if key is None] == ["ollama"]
+    for name, key in keys.items():
+        if name != "ollama":
+            assert key == "LLM_API_KEY", f"{name} must read LLM_API_KEY"
 
 
 def test_port_vars_have_values(env_example_vars):

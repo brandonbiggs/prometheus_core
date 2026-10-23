@@ -11,7 +11,7 @@ An interactive scaffolding tool that generates a ready-to-run A2A agent from a t
 ## Quick start
 
 ```bash
-cd prometheus_platform/agent-template
+cd prometheus_core/agent-template
 
 # Run the scaffolding script
 python setup_agent.py
@@ -206,7 +206,7 @@ The generated Dockerfile:
 
 - Base image: `python:3.11-slim`
 - Supports `HTTP_PROXY` / `HTTPS_PROXY` build args
-- Health check on `/health` endpoint every 30 seconds
+- Health check on `/healthz` endpoint every 30 seconds
 
 ### Docker Compose (multi-agent)
 
@@ -218,7 +218,7 @@ services:
       - "8300:8000"
     env_file: ./agent-one/.env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
       retries: 3
 
@@ -235,7 +235,7 @@ Every generated agent exposes:
 
 | Path | Auth | Description |
 |------|------|-------------|
-| `GET /health` | No | Health check |
+| `GET /healthz` | No | Health check |
 | `GET /.well-known/agent.json` | No | Agent card (A2A discovery) |
 | `POST /message` | Yes | A2A JSON-RPC 2.0 message endpoint |
 
@@ -244,7 +244,7 @@ Every generated agent exposes:
 Agents communicate using JSON-RPC 2.0 with the `message/send` method:
 
 If you test this request against a Dockerized target agent on localhost, run that
-agent in external network mode; see the [agent template run instructions](https://github.inl.gov/genesis/prometheus_platform/blob/dev/agent-template/README.md#run-it).
+agent in external network mode; see the [agent template run instructions](https://github.com/idaholab/prometheus_core/blob/devel/agent-template/README.md#run-it).
 
 **Request:**
 

@@ -1,0 +1,39 @@
+codecov:
+  notify:
+    # One upload per unit that reports coverage; raise it as units are added
+    after_n_builds: 9
+
+coverage:
+  status:
+    # No coverage floors yet
+    project: off
+    patch: off
+
+flags:
+  sdk:
+    paths:
+      - sdk/prometheus_api/
+  backend:
+    paths:
+      - platform/backend/app/
+  client-agent:
+    paths:
+      - platform/agents/client-agent/
+  osti-research-agent:
+    paths:
+      - platform/agents/optional/osti-research-agent/
+  code-render-debug-agent:
+    paths:
+      - platform/agents/debug-agents/code-render-debug-agent/
+  corrosion-agent:
+    paths:
+      - platform/agents/debug-agents/corrosion-agent/
+  thermal-agent:
+    paths:
+      - platform/agents/debug-agents/thermal-agent/
+  agent-template:
+    paths:
+      - agent-template/setup_agent.py
+  template-agent:
+    paths:
+      - agent-template/agent_template/

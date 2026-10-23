@@ -14,10 +14,17 @@
 
 from .client import AsyncLLMClient, LLMClient
 from .config import FallbackModelConfig, LLMConfig
-from .exceptions import LLMAliasError, LLMClientError, LLMToolCallError
+from .exceptions import (
+    LLMAliasError,
+    LLMClientError,
+    LLMConfigError,
+    LLMEndpointUnavailableError,
+    LLMProviderError,
+    LLMToolCallError,
+)
 from .models import ChatResponse, EmbeddingResponse
 from .normalization import normalize_embedding_input, normalize_messages
-from .security import extract_llm_api_key_from_a2a_context, redact_secrets
+from .security import redact_secrets
 from .tools import (
     ToolCall,
     ToolDefinition,
@@ -40,6 +47,9 @@ __all__ = [
     "LLMAliasError",
     "LLMClient",
     "LLMClientError",
+    "LLMConfigError",
+    "LLMEndpointUnavailableError",
+    "LLMProviderError",
     "LLMConfig",
     "LLMToolCallError",
     "ToolCall",
@@ -49,7 +59,6 @@ __all__ = [
     "assistant_message",
     "call_tool",
     "enable_mlflow_x_api_key",
-    "extract_llm_api_key_from_a2a_context",
     "normalize_embedding_input",
     "normalize_messages",
     "parse_finish_reason",

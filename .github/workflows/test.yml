@@ -49,10 +49,18 @@ jobs:
         project:
           - sdk
           - platform/backend
+          - platform/tests
+          - platform/scripts
           - agent-template
+        include:
+          # Not a uv project; linted with platform/tests' locked ruff
+          - project: platform/scripts
+            uv-project: ../tests
     defaults:
       run:
         working-directory: ${{ matrix.project }}
+    env:
+      UV_PROJECT: ${{ matrix.uv-project || '.' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -152,7 +160,121 @@ jobs:
       - name: Sync environment
         run: uv sync --frozen
       - name: Test
-        run: uv run --frozen pytest --color=yes
+        # Fails below fail_under in pyproject.toml on every version
+        run: uv run --frozen pytest --color=yes --cov --cov-report=xml
+      - name: Coverage
+        # Report and upload only on 3.12, so the sdk reports once per commit
+        if: ${{ !cancelled() && matrix.python == '3.12' }}
+        uses: ./.github/actions/coverage
+        with:
+          directory: sdk
+          flag: sdk
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  sdk-install:
+    name: "sdk: install"
+    needs: gitleaks
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.25"
+          python-version: "3.12"
+      - name: Test install
+        # Builds the wheel and imports every package from a clean venv
+        run: make test-install
+
+  agent-template:
+    name: "agent-template: python ${{ matrix.python }}"
+    needs: gitleaks
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: agent-template
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.25"
+          python-version: ${{ matrix.python }}
+      - name: Sync environment
+        run: uv sync --frozen
+      - name: Test
+        # Fails below fail_under in pyproject.toml on every version
+        run: uv run --frozen pytest --color=yes --cov --cov-report=xml
+      - name: Coverage
+        # Report and upload only on 3.12, so the scaffolder reports once per commit
+        if: ${{ !cancelled() && matrix.python == '3.12' }}
+        uses: ./.github/actions/coverage
+        with:
+          directory: agent-template
+          flag: agent-template
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: uv run --frozen mypy setup_agent.py
+
+  agent-template-scaffold:
+    name: "agent-template: scaffold python ${{ matrix.python }}"
+    needs: gitleaks
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.25"
+          python-version: ${{ matrix.python }}
+      - name: Sync environment
+        # For agent-template's locked ruff
+        working-directory: agent-template
+        run: uv sync --frozen --only-dev
+      - name: Scaffold
+        working-directory: agent-template
+        run: uv run --frozen --no-sync python setup_agent.py --yes "Smoke Test" "$RUNNER_TEMP/smoke-test"
+      - name: Check for placeholders
+        working-directory: ${{ runner.temp }}/smoke-test
+        run: |
+          if grep -rn 'TEMPLATE_[A-Z]' .; then
+            echo "::error::The scaffolded agent still has template placeholders"
+            exit 1
+          fi
+      - name: Install dependencies
+        working-directory: ${{ runner.temp }}/smoke-test
+        env:
+          # The scaffold pins .python-version to 3.12; test the matrix version
+          PYTHON: ${{ matrix.python }}
+        run: |
+          uv venv --python "$PYTHON"
+          uv pip install -r pyproject.toml pytest pytest-asyncio "$GITHUB_WORKSPACE/sdk"
+      - name: Lint
+        working-directory: ${{ runner.temp }}/smoke-test
+        env:
+          UV_PROJECT: ${{ github.workspace }}/agent-template
+        run: |
+          uv run --frozen --no-sync ruff check --output-format=github .
+          uv run --frozen --no-sync ruff format --check --diff .
+      - name: Test
+        if: ${{ !cancelled() }}
+        working-directory: ${{ runner.temp }}/smoke-test
+        run: .venv/bin/python -m pytest --color=yes
 
   sdk-docker:
     name: "sdk: docker ${{ matrix.platform }}"
@@ -271,30 +393,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        with:
-          # The docker driver builds into the local image store, so the backend
-          # build can use the sdk image without a registry
-          driver: docker
-      - name: Build sdk image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: sdk
-          file: sdk/Dockerfile
-          build-contexts: certs=common/certs
-          platforms: linux/${{ matrix.platform }}
-          push: false
-          load: true
-          tags: prometheus-api:${{ matrix.platform }}
       - name: Build backend image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
+          # Same context and sdk/certs contexts as docker-compose.yml
           context: platform/backend
           file: platform/backend/Dockerfile
+          build-contexts: |
+            sdk=sdk
+            certs=common/certs
           platforms: linux/${{ matrix.platform }}
           push: false
-          build-args: |
-            PROMETHEUS_API_BASE_IMAGE_REPO=prometheus-api
-            PROMETHEUS_API_BASE_IMAGE_HASH=${{ matrix.platform }}
 
   platform-backend-python:
     name: "platform: backend python ${{ matrix.python }}"
@@ -319,8 +428,19 @@ jobs:
         run: |
           uv sync --frozen --no-install-package prometheus-api
           uv pip install --no-deps ../../sdk
+      - name: Type check
+        run: uv run --frozen --no-sync mypy app
       - name: Test
-        run: uv run --frozen --no-sync pytest --color=yes
+        # Fails below fail_under in pyproject.toml on every version
+        run: uv run --frozen --no-sync pytest --color=yes --cov --cov-report=xml
+      - name: Coverage
+        # Report and upload only on 3.12, so the backend reports once per commit
+        if: ${{ !cancelled() && matrix.python == '3.12' }}
+        uses: ./.github/actions/coverage
+        with:
+          directory: platform/backend
+          flag: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   platform-infrastructure:
     name: "platform: infrastructure"
@@ -346,6 +466,46 @@ jobs:
         # current directory on sys.path, which the tests need to import system/
         run: uv run --frozen --no-sync python -m pytest --color=yes -m "not integration"
 
+  platform-up:
+    name: "platform: up"
+    needs: gitleaks
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: platform
+    env:
+      # Build the prometheus_api base image from ../sdk instead of pulling it
+      LOCAL_SDK: "true"
+      DEBUG_AGENTS: "true"
+      OPTIONAL_AGENTS: "false"
+      PROFILE: prod
+      # make up runs init_env.py, which creates .env from .env.example,
+      # generates every secret, and takes this key from the environment.
+      # Nothing calls an LLM at startup, so a placeholder is enough
+      LLM_API_KEY: sk-ant-test-not-real
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Start
+        # make up waits for every healthcheck, then runs make check: the
+        # backend and frontend on their host ports, the frontend's /api proxy,
+        # and every agent registered with LiteLLM
+        run: make up
+      - name: Show status
+        if: ${{ failure() }}
+        run: docker ps --all
+      - name: Show logs
+        if: ${{ failure() }}
+        # The same files and profile make up used, so the agents are included
+        run: |
+          docker compose -p prometheus_platform \
+            -f docker-compose.yml -f docker-compose.agents.yml --profile "$PROFILE" \
+            logs --no-color --timestamps
+      - name: Stop
+        if: ${{ always() }}
+        run: make down-v
+
   platform-agent:
     name: "platform: agent ${{ matrix.agent }}"
     needs: gitleaks
@@ -356,16 +516,24 @@ jobs:
         include:
           - agent: client-agent
             path: platform/agents/client-agent
+            flag: client-agent
           - agent: osti-research-agent
             path: platform/agents/optional/osti-research-agent
+            flag: osti-research-agent
             # marker-pdf pulls in PyTorch with CUDA and the tests don't use it
             overrides: "marker-pdf; sys_platform == 'never'"
           - agent: code-render-debug-agent
             path: platform/agents/debug-agents/code-render-debug-agent
+            flag: code-render-debug-agent
           - agent: corrosion-agent
             path: platform/agents/debug-agents/corrosion-agent
+            flag: corrosion-agent
           - agent: thermal-agent
             path: platform/agents/debug-agents/thermal-agent
+            flag: thermal-agent
+          - agent: agent-template
+            path: agent-template/agent_template
+            flag: template-agent
     defaults:
       run:
         working-directory: ${{ matrix.path }}
@@ -384,6 +552,14 @@ jobs:
           printf '%s\n' "$OVERRIDES" > "$RUNNER_TEMP/overrides.txt"
           uv venv
           uv pip install -r pyproject.toml --overrides "$RUNNER_TEMP/overrides.txt" \
-            pytest pytest-asyncio "$GITHUB_WORKSPACE/sdk"
+            pytest pytest-asyncio pytest-cov "$GITHUB_WORKSPACE/sdk"
       - name: Test
-        run: .venv/bin/python -m pytest --color=yes
+        # Agents with a flag fail below fail_under in their pyproject.toml
+        run: .venv/bin/python -m pytest --color=yes ${{ matrix.flag && '--cov --cov-report=xml' || '' }}
+      - name: Coverage
+        if: ${{ !cancelled() && matrix.flag }}
+        uses: ./.github/actions/coverage
+        with:
+          directory: ${{ matrix.path }}
+          flag: ${{ matrix.flag }}
+          token: ${{ secrets.CODECOV_TOKEN }}
