@@ -50,7 +50,6 @@ OPTIONAL_AGENTS ?= false
 # or reconfigures Docker.
 PROMETHEUS_SYSTEM_TESTING ?= false
 CLIENT_AGENT_PORT ?= 8001
-LITELLM_LOCAL_PORT ?= 9977
 PROMETHEUS_SYSTEM_TEST_URL ?= http://localhost:$(CLIENT_AGENT_PORT)
 
 # Set PROFILE=prod to bring up the React frontend in production mode instead,
@@ -114,8 +113,6 @@ endif
 
 CLEAR_COMPOSE_FILES ?= $(COMPOSE_FILES_NG)
 
-LITELLM_DB_VOLUME := $(COMPOSE_PROJECT_NAME)_litellm-db-data
-
 ##@
 ##@ Help
 ##@
@@ -161,7 +158,7 @@ PREREQUISITE_TARGETS := \
 	ng-up-fg \
 	ng-restart \
 	ng-restart-fg \
-	clear-litellm-db \
+	clear-agent-registry \
 	down \
 	down-v \
 	base-image \
@@ -172,7 +169,7 @@ PREREQUISITE_TARGETS := \
 
 $(PREREQUISITE_TARGETS): check-prerequisites
 
-.PHONY: all up up-fg down down-v build base-image build-plain logs ps generate clean-generated regenerate restart restart-fg ng-up ng-up-fg ng-restart ng-restart-fg init-env clear-litellm-db clear-admin-users clobber help
+.PHONY: all up up-fg down down-v build base-image build-plain logs ps generate clean-generated regenerate restart restart-fg ng-up ng-up-fg ng-restart ng-restart-fg init-env clear-agent-registry clear-admin-users clobber help
 
 FORCE:
 
@@ -235,60 +232,60 @@ check: ##@ Wait until the running platform answers on its host ports and every a
 ##@ Compose
 ##@
 
-up: ##@ Clear LiteLLM DB, build and start all services (detached), then wait until they are up (CHECK=false to skip). Set PROFILE=dev|prod to include the React frontend.
+up: ##@ Clear agent registrations, build and start all services (detached), then wait until they are up (CHECK=false to skip). Set PROFILE=dev|prod to include the React frontend.
 up: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-up: $(BASE_IMAGE_DEP) generate init-env clear-litellm-db
+up: $(BASE_IMAGE_DEP) generate init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up --build -d $(UP_WAIT) $(UP_ARGS)
 	$(RUN_CHECK)
 
-up-fg: ##@ Clear LiteLLM DB, then build and start all services (foreground). Set PROFILE=dev|prod to include the React frontend.
+up-fg: ##@ Clear agent registrations, then build and start all services (foreground). Set PROFILE=dev|prod to include the React frontend.
 up-fg: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-up-fg: $(BASE_IMAGE_DEP) generate init-env clear-litellm-db
+up-fg: $(BASE_IMAGE_DEP) generate init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up --build
 
-restart: ##@ Clear LiteLLM DB, then restart all services without rebuilding.
+restart: ##@ Clear agent registrations, then restart all services without rebuilding.
 restart: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-restart: generate init-env clear-litellm-db
+restart: generate init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up -d $(UP_WAIT)
 	$(RUN_CHECK)
 
-restart-fg: ##@ Clear LiteLLM DB, then restart all services without rebuilding (foreground).
+restart-fg: ##@ Clear agent registrations, then restart all services without rebuilding (foreground).
 restart-fg: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-restart-fg: generate init-env clear-litellm-db
+restart-fg: generate init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up
 
-ng-up: ##@ Clear LiteLLM DB, then start without regenerating agents compose.
-ng-up: $(BASE_IMAGE_DEP) init-env clear-litellm-db
+ng-up: ##@ Clear agent registrations, then start without regenerating agents compose.
+ng-up: $(BASE_IMAGE_DEP) init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up --build -d $(UP_WAIT)
 	$(RUN_CHECK)
 
-ng-up-fg: ##@ Clear LiteLLM DB, then start without regenerating (foreground).
-ng-up-fg: $(BASE_IMAGE_DEP) init-env clear-litellm-db
+ng-up-fg: ##@ Clear agent registrations, then start without regenerating (foreground).
+ng-up-fg: $(BASE_IMAGE_DEP) init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up --build
 
-ng-restart: ##@ Clear LiteLLM DB, then restart without rebuilding or regenerating.
-ng-restart: init-env clear-litellm-db
+ng-restart: ##@ Clear agent registrations, then restart without rebuilding or regenerating.
+ng-restart: init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up -d $(UP_WAIT)
 	$(RUN_CHECK)
 
-ng-restart-fg: ##@ Clear LiteLLM DB, then restart without rebuilding or regenerating (foreground).
-ng-restart-fg: init-env clear-litellm-db
+ng-restart-fg: ##@ Clear agent registrations, then restart without rebuilding or regenerating (foreground).
+ng-restart-fg: init-env clear-agent-registry
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up
 
 init-env: ##@ Create .env from .env.example if missing, generate blank secrets, check the LLM API key
 	@python3 scripts/init_env.py
 
-clear-litellm-db: ##@ Stop services and remove only the LiteLLM Postgres volume
+# Agents register with the backend at startup and the registry lives in Valkey,
+# which persists across restarts. Clearing it on every launch keeps an agent that
+# was removed (or renamed) from lingering as a tool. Valkey must be up to clear
+# it, so this starts only redis; the start target that follows reuses it.
+clear-agent-registry: ##@ Stop services and delete only the agent registrations from Valkey
 	$(COMPOSE) $(CLEAR_COMPOSE_FILES) down --remove-orphans
-	@set -e; \
-	volume=$$(docker volume ls -q \
-		--filter "label=com.docker.compose.project=$(COMPOSE_PROJECT_NAME)" \
-		--filter "label=com.docker.compose.volume=litellm-db-data"); \
-	if [ -n "$$volume" ]; then \
-		docker volume rm -f $$volume; \
-	else \
-		printf "LiteLLM DB volume %s does not exist; nothing to remove.\n" "$(LITELLM_DB_VOLUME)"; \
-	fi
+	$(COMPOSE) $(CLEAR_COMPOSE_FILES) up -d redis
+	@$(COMPOSE) $(CLEAR_COMPOSE_FILES) exec -T redis sh -c '\
+		cli="valkey-cli --no-auth-warning -a $$REDIS_PASSWORD"; \
+		for i in $$(seq 1 30); do $$cli ping >/dev/null 2>&1 && break; sleep 1; done; \
+		printf "Cleared %s agent registration key(s).\n" "$$($$cli DEL prometheus:agent-registry)"'
 
 clear-admin-users: ##@ Delete all rows from admin-db's users table (re-triggers the first-run setup wizard)
 	@if ! $(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) ps --status running --services 2>/dev/null | grep -qx admin-db; then \
@@ -298,11 +295,11 @@ clear-admin-users: ##@ Delete all rows from admin-db's users table (re-triggers 
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) exec -T admin-db psql -U admin -d admin -c "TRUNCATE TABLE users;"
 	@printf "Deleted all rows from admin-db's users table -- the platform will show the first-run setup wizard again.\n"
 
-# Volumes whose contents are tied to secrets generated into .env: the two
-# Postgres data dirs (passwords are fixed at first init, admin rows are
+# Volumes whose contents are tied to secrets generated into .env: admin-db's
+# Postgres data dir (its password is fixed at first init, admin rows are
 # encrypted with ADMIN_DB_ENCRYPTION_KEY) and Valkey (sessions and history of
 # users that live in admin-db). Caches (mesh-cache, model caches) are kept.
-CLOBBER_VOLUMES := admin-db-data litellm-db-data valkey-data
+CLOBBER_VOLUMES := admin-db-data valkey-data
 
 clobber: ##@ Stop services and delete the DB and Valkey volumes (users, keys, history). For reinstalling after .env was lost.
 	@printf "This deletes ALL users, signing keys, OIDC config, and chat history of\n"

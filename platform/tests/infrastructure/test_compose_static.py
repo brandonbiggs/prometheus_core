@@ -60,20 +60,13 @@ def _image_tag(svc):
 
 
 def test_postgres_image_version(compose_data):
-    assert _image_tag(compose_data["services"]["litellm-db"]) == "postgres:16.15-alpine"
+    assert _image_tag(compose_data["services"]["admin-db"]) == "postgres:16.15-alpine"
 
 
 def test_redis_service_uses_valkey_bundle(compose_data):
     svc = compose_data["services"]["redis"]
     assert _image_tag(svc) == "valkey/valkey-bundle:9.1.0"
     assert svc["command"][:1] == ["valkey-server"]
-
-
-def test_litellm_image_pinned(compose_data):
-    image = _image_tag(compose_data["services"]["litellm"])
-    assert image == "ghcr.io/berriai/litellm:v1.92.0", (
-        "LiteLLM 1.92.0 is the minimum pinned gateway with A2A SDK v1 routing"
-    )
 
 
 def test_client_agent_receives_selectable_llm_configuration(compose_data):
@@ -88,9 +81,6 @@ def test_client_agent_receives_selectable_llm_configuration(compose_data):
     assert client_env["LLM_CONFIG_FILE"] == "${LLM_CONFIG_FILE:-}"
     for key in ("LLM_API_KEY", "EMBEDDING_API_KEY"):
         assert client_env[key] == f"${{{key}:-}}"
-
-    proxy_env = compose_data["services"]["litellm"]["environment"]
-    assert proxy_env["LLM_API_KEY"] == "${LLM_API_KEY}"
 
 
 def test_client_agent_port_is_published_only_by_system_test_override(
@@ -126,7 +116,14 @@ def test_compose_has_networks_section(compose_data):
 def test_compose_has_volumes_section(compose_data):
     volumes = compose_data.get("volumes", {})
     assert "valkey-data" in volumes, "Missing 'valkey-data' named volume"
-    assert "litellm-db-data" in volumes, "Missing 'litellm-db-data' named volume"
+    assert "admin-db-data" in volumes, "Missing 'admin-db-data' named volume"
+
+
+def test_no_litellm_services(compose_data):
+    """The backend hosts the agent registry and gateway; LiteLLM is gone from the platform."""
+    leftovers = [name for name in compose_data["services"] if "litellm" in name]
+    assert not leftovers, f"LiteLLM services remain: {leftovers}"
+    assert not [v for v in compose_data.get("volumes", {}) if "litellm" in v]
 
 
 def test_every_agent_sets_external_agent_url(project_root, compose_data):
