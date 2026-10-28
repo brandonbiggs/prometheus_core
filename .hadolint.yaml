@@ -1,0 +1,6 @@
+ignored:
+  # Pin versions in apt-get install. Debian drops superseded package versions
+  # from its mirrors, so exact pins break the build on every point release. The
+  # base images are pinned instead (by digest where it matters), which fixes
+  # the package set
+  - DL3008
