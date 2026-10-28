@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import type { OidcProvider } from "@/lib/api/types";
+import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 
 const DEFAULT_SCOPES = "openid profile email";
@@ -161,10 +162,7 @@ export function AdminOidcProviders() {
             <code>/api/auth/callback/&lt;provider_id&gt;</code>.
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={openCreate}>
-          <Plus size={15} />
-          New provider
-        </button>
+        <Button variant="primary" size="sm" icon={<Plus />} label="New provider" onClick={openCreate} />
       </div>
 
       {error && (
@@ -202,16 +200,8 @@ export function AdminOidcProviders() {
                     />
                   </td>
                   <td className="flex gap-1 justify-end">
-                    <button className="btn btn-ghost btn-xs" onClick={() => openEdit(provider)} aria-label="Edit provider">
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-xs text-error"
-                      onClick={() => handleDelete(provider)}
-                      aria-label="Delete provider"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <Button variant="ghost" size="xs" icon={<Pencil />} ariaLabel="Edit provider" onClick={() => openEdit(provider)} />
+                    <Button variant="error" soft size="xs" icon={<Trash2 />} ariaLabel="Delete provider" onClick={() => handleDelete(provider)} />
                   </td>
                 </tr>
               ))}
@@ -320,11 +310,9 @@ export function AdminOidcProviders() {
           </div>
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn btn-ghost btn-sm">Cancel</button>
+              <Button variant="ghost" size="sm" type="submit" label="Cancel" />
             </form>
-            <button className="btn btn-primary btn-sm" onClick={submitCreate} disabled={creating}>
-              {creating ? "Creating..." : "Create"}
-            </button>
+            <Button variant="primary" size="sm" type="submit" label={creating ? "Creating..." : "Create"} loading={creating} onClick={submitCreate} />
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">
@@ -420,11 +408,9 @@ export function AdminOidcProviders() {
           </div>
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn btn-ghost btn-sm">Cancel</button>
+              <Button variant="ghost" size="sm" type="submit" label="Cancel" />
             </form>
-            <button className="btn btn-primary btn-sm" onClick={submitEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save"}
-            </button>
+            <Button variant="primary" size="sm" type="submit" label={saving ? "Saving..." : "Save"} loading={saving} onClick={submitEdit} />
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">
