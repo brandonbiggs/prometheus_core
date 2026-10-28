@@ -19,6 +19,7 @@ the frontend consume). The base executor turns ``send_status_update`` into a
 non-final ``TaskStatusUpdateEvent`` (covered in ``prometheus_api`` tests); this
 test asserts the agent itself emits one mid-execution.
 """
+
 import asyncio
 import importlib.util
 import json
@@ -92,8 +93,7 @@ def test_streaming_agent_emits_intermediate_status_update(monkeypatch):
     status_updates = [
         e
         for e in events
-        if type(e).__name__ == "TaskStatusUpdateEvent"
-        and e.status.state == TaskState.TASK_STATE_WORKING
+        if type(e).__name__ == "TaskStatusUpdateEvent" and e.status.state == TaskState.TASK_STATE_WORKING
     ]
     assert status_updates, "a streaming:true agent must emit a non-final status-update during _execute"
     # The analysis still completes normally.

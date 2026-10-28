@@ -162,7 +162,11 @@ def test_an_artifact_only_in_the_response_json_is_new(orchestrator, monkeypatch)
             conversation_id=CONV,
             status="completed",
             report="made",
-            tool_results={"skill": {"result": {"artifacts": [{"artifact_id": "inline", "name": "inline.json", "json_body": {"k": 1}}]}}},
+            tool_results={
+                "skill": {
+                    "result": {"artifacts": [{"artifact_id": "inline", "name": "inline.json", "json_body": {"k": 1}}]}
+                }
+            },
         )
 
     monkeypatch.setattr(service_mod, "chat", fake_chat)

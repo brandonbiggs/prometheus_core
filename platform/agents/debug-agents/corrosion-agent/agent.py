@@ -16,6 +16,7 @@ on LLM queries. Does not perform actual modeling and simulation work. Use this
 only for orchestration debugging!
 Implements A2A protocol using prometheus_api with Bearer token authentication
 """
+
 import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List

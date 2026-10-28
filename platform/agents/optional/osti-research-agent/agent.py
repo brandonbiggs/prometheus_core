@@ -45,10 +45,7 @@ from a2a.server.agent_execution.context import RequestContext
 from a2a.server.events import EventQueue
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -121,9 +118,7 @@ def deduplicate_provenance_simple(provenance: List[Dict[str, Any]]) -> List[Dict
     return deduplicated
 
 
-def deduplicate_provenance_with_mapping(
-    answers: List[Dict[str, Any]]
-) -> tuple[List[Dict[str, Any]], Dict[int, int]]:
+def deduplicate_provenance_with_mapping(answers: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], Dict[int, int]]:
     """
     Deduplicate answers by OSTI ID and build a mapping from original paper numbers
     to deduplicated provenance indices.
@@ -161,23 +156,23 @@ def deduplicate_provenance_with_mapping(
             if osti_id:
                 seen_ids[osti_id] = prov_idx
 
-            provenance.append({
-                "source": f"OSTI #{osti_id}" if osti_id else "Unknown",
-                "title": ans["title"],
-                "url": ans["url"],
-                "excerpt": ans.get("excerpt", "")[:500],
-                "confidence": ans.get("confidence", 0.5),
-                "original_papers": [original_paper_num]
-            })
+            provenance.append(
+                {
+                    "source": f"OSTI #{osti_id}" if osti_id else "Unknown",
+                    "title": ans["title"],
+                    "url": ans["url"],
+                    "excerpt": ans.get("excerpt", "")[:500],
+                    "confidence": ans.get("confidence", 0.5),
+                    "original_papers": [original_paper_num],
+                }
+            )
             paper_to_provenance[original_paper_num] = prov_idx + 1  # 1-indexed
 
     return provenance, paper_to_provenance
 
 
 def linkify_paper_references(
-    answer_text: str,
-    provenance: List[Dict[str, Any]],
-    paper_to_provenance: Dict[int, int] = None
+    answer_text: str, provenance: List[Dict[str, Any]], paper_to_provenance: Dict[int, int] = None
 ) -> str:
     """
     Convert 'Paper X' citations to clickable [Paper N](url) links.
@@ -217,7 +212,7 @@ def linkify_paper_references(
         return match.group(0)  # Keep original if no mapping found
 
     # Match patterns like "Paper 1", "Paper 2", etc.
-    result = re.sub(r'Paper\s*(\d+)', replace_citation, answer_text)
+    result = re.sub(r"Paper\s*(\d+)", replace_citation, answer_text)
     return result
 
 
@@ -249,15 +244,13 @@ class OSTIResearchAgent(PrometheusAgent):
     def redis_binary_client(self) -> redis.Redis:
         """Lazy initialization of Redis client for binary data (PDFs)."""
         if self._redis_binary_client is None:
-            self._redis_binary_client = create_redis_client(
-                REDIS_URL, decode_responses=False, ping=False
-            )
+            self._redis_binary_client = create_redis_client(REDIS_URL, decode_responses=False, ping=False)
         return self._redis_binary_client
 
     def extract_json_from_text(self, text: str) -> Optional[Any]:
         """Extract JSON from text that may contain markdown code blocks."""
         # Try to find JSON in code blocks first
-        json_match = re.search(r'```json\s*(\[.*?\]|\{.*?\})\s*```', text, re.DOTALL)
+        json_match = re.search(r"```json\s*(\[.*?\]|\{.*?\})\s*```", text, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(1))
@@ -265,7 +258,7 @@ class OSTIResearchAgent(PrometheusAgent):
                 pass
 
         # Try to find raw JSON object or array
-        json_match = re.search(r'(\[.*\]|\{.*\})', text, re.DOTALL)
+        json_match = re.search(r"(\[.*\]|\{.*\})", text, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(0))
@@ -302,7 +295,9 @@ class OSTIResearchAgent(PrometheusAgent):
 
             sufficient = bool(synthesized.get("sufficient_for_answer", False))
             if not sufficient:
-                logger.info("Knowledge-base synthesis found insufficient information; will fall back to live OSTI search.")
+                logger.info(
+                    "Knowledge-base synthesis found insufficient information; will fall back to live OSTI search."
+                )
 
             synthesized["sufficient"] = sufficient
             synthesized["memory_source"] = "factoid_synthesis"
@@ -359,12 +354,14 @@ class OSTIResearchAgent(PrometheusAgent):
         llm: Any,
     ) -> Dict[str, Any]:
         """Synthesize answer from stored factoids."""
-        factoids_text = "\n\n".join([
-            f"Fact {i}: {f['content']}\n"
-            f"Source: {f['source_paper'].get('title', 'Unknown')} (OSTI #{f['source_paper'].get('osti_id', 'N/A')})\n"
-            f"Confidence: {f.get('confidence', 0.5)}"
-            for i, f in enumerate(factoids, 1)
-        ])
+        factoids_text = "\n\n".join(
+            [
+                f"Fact {i}: {f['content']}\n"
+                f"Source: {f['source_paper'].get('title', 'Unknown')} (OSTI #{f['source_paper'].get('osti_id', 'N/A')})\n"
+                f"Confidence: {f.get('confidence', 0.5)}"
+                for i, f in enumerate(factoids, 1)
+            ]
+        )
 
         prompt = SYNTHESIZE_MEMORY_PROMPT_TEMPLATE.format(
             question=question,
@@ -401,11 +398,11 @@ class OSTIResearchAgent(PrometheusAgent):
                 "sources": [
                     {
                         "source": f"OSTI #{f['source_paper'].get('osti_id', 'N/A')}",
-                        "osti_id": f['source_paper'].get('osti_id', ''),
-                        "title": f['source_paper'].get('title', 'Unknown'),
-                        "url": f['source_paper'].get('url', ''),
-                        "excerpt": f['content'][:500],
-                        "confidence": f.get('confidence', 0.5)
+                        "osti_id": f["source_paper"].get("osti_id", ""),
+                        "title": f["source_paper"].get("title", "Unknown"),
+                        "url": f["source_paper"].get("url", ""),
+                        "excerpt": f["content"][:500],
+                        "confidence": f.get("confidence", 0.5),
                     }
                     for f in factoids
                 ],
@@ -421,11 +418,7 @@ class OSTIResearchAgent(PrometheusAgent):
         """Cache question-answer pair for instant retrieval."""
         question_hash = hashlib.md5(question.lower().encode()).hexdigest()
 
-        cache_data = {
-            "answer": answer,
-            "sources": sources,
-            "cached_at": datetime.now(timezone.utc).isoformat()
-        }
+        cache_data = {"answer": answer, "sources": sources, "cached_at": datetime.now(timezone.utc).isoformat()}
 
         # Store with 30-day TTL
         self.redis_client.set(
@@ -445,28 +438,19 @@ class OSTIResearchAgent(PrometheusAgent):
             "topics": topics,
             "confidence": 0.85,
             "extracted_at": datetime.now(timezone.utc).isoformat(),
-            "question_answered": question
+            "question_answered": question,
         }
 
         # Store factoid
-        self.redis_client.set(
-            f"osti:factoid:{factoid_id}",
-            json.dumps(factoid)
-        )
+        self.redis_client.set(f"osti:factoid:{factoid_id}", json.dumps(factoid))
 
         # Index by paper
         if source_paper.get("osti_id"):
-            self.redis_client.sadd(
-                f"osti:paper:{source_paper['osti_id']}:facts",
-                factoid_id
-            )
+            self.redis_client.sadd(f"osti:paper:{source_paper['osti_id']}:facts", factoid_id)
 
         # Index by topics
         for topic in topics:
-            self.redis_client.sadd(
-                f"osti:topic:{topic}:factoids",
-                factoid_id
-            )
+            self.redis_client.sadd(f"osti:topic:{topic}:factoids", factoid_id)
 
         return factoid_id
 
@@ -477,7 +461,7 @@ class OSTIResearchAgent(PrometheusAgent):
         try:
             response = await llm.medium(prompt, max_tokens=256)
 
-            return response.text.strip().strip('"\'')
+            return response.text.strip().strip("\"'")
         except Exception as e:
             logger.error(f"Error formulating search query: {e}")
             # Fallback: extract key terms from question
@@ -521,14 +505,16 @@ class OSTIResearchAgent(PrometheusAgent):
                 logger.info(f"[OSTI API] Page {page}: Got {len(data)} records")
 
                 for result in data:
-                    if 'description' in result and 'osti_id' in result:
-                        results.append({
-                            "osti_id": result["osti_id"],
-                            "title": result.get("title", ""),
-                            "description": result.get("description", ""),
-                            "journal_name": result.get("journal_name", ""),
-                            "url": f"https://www.osti.gov/biblio/{result['osti_id']}"
-                        })
+                    if "description" in result and "osti_id" in result:
+                        results.append(
+                            {
+                                "osti_id": result["osti_id"],
+                                "title": result.get("title", ""),
+                                "description": result.get("description", ""),
+                                "journal_name": result.get("journal_name", ""),
+                                "url": f"https://www.osti.gov/biblio/{result['osti_id']}",
+                            }
+                        )
                         logger.info(f"[OSTI API] Added: {result.get('title', 'No title')[:60]}...")
 
                         if len(results) >= max_results:
@@ -574,7 +560,7 @@ class OSTIResearchAgent(PrometheusAgent):
 
     def download_paper(self, osti_id: str) -> Optional[str]:
         """Download paper from OSTI with Redis caching to avoid repeat downloads."""
-        filepath = f'/tmp/osti_{osti_id}.pdf'
+        filepath = f"/tmp/osti_{osti_id}.pdf"
 
         # Check if file exists locally first
         if os.path.exists(filepath):
@@ -586,23 +572,23 @@ class OSTIResearchAgent(PrometheusAgent):
             pdf_bytes = self.redis_binary_client.get(f"osti:paper:pdf_bytes:{osti_id}")
             if pdf_bytes:
                 logger.info(f"Paper {osti_id} found in Redis cache ({len(pdf_bytes)} bytes)")
-                with open(filepath, 'wb') as f:
+                with open(filepath, "wb") as f:
                     f.write(pdf_bytes)
                 return filepath
         except Exception as e:
             logger.warning(f"Redis cache check failed: {e}")
 
         # Download from OSTI
-        url = f'https://www.osti.gov/servlets/purl/{osti_id}'
+        url = f"https://www.osti.gov/servlets/purl/{osti_id}"
         logger.info(f"Downloading paper {osti_id} from OSTI...")
 
         try:
             session = requests.Session()
             response = session.get(url, verify=False, timeout=120)
 
-            if response.status_code == 200 and 'application/pdf' in response.headers.get('Content-Type', ''):
+            if response.status_code == 200 and "application/pdf" in response.headers.get("Content-Type", ""):
                 # Save to local file
-                with open(filepath, 'wb') as f:
+                with open(filepath, "wb") as f:
                     f.write(response.content)
 
                 # Cache in Redis (30 day TTL) - use binary client for PDF data
@@ -628,6 +614,7 @@ class OSTIResearchAgent(PrometheusAgent):
         """Fast PDF text extraction using PyMuPDF (fitz)."""
         try:
             import fitz  # PyMuPDF
+
             logger.info(f"[pymupdf] Opening PDF: {pdf_path}")
             logger.info(f"[pymupdf] PyMuPDF version: {fitz.version}")
 
@@ -647,7 +634,9 @@ class OSTIResearchAgent(PrometheusAgent):
                         text_parts.append(page_text if page_text else "")
 
                         if page_num % 10 == 0:
-                            logger.info(f"[pymupdf] Page {page_num + 1}/{page_count}: {char_count} chars (total: {total_chars})")
+                            logger.info(
+                                f"[pymupdf] Page {page_num + 1}/{page_count}: {char_count} chars (total: {total_chars})"
+                            )
                     except Exception as page_error:
                         logger.error(f"[pymupdf] Error on page {page_num + 1}: {page_error}")
                         text_parts.append("")
@@ -694,7 +683,7 @@ except Exception as e:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env={**os.environ, "CUDA_VISIBLE_DEVICES": "", "TORCH_NUM_THREADS": "1"}
+                env={**os.environ, "CUDA_VISIBLE_DEVICES": "", "TORCH_NUM_THREADS": "1"},
             )
 
             if result.returncode == 0:
@@ -727,6 +716,7 @@ except Exception as e:
             from marker.converters.pdf import PdfConverter
             from marker.models import create_model_dict
             from marker.output import text_from_rendered
+
             logger.info("[marker] Imports complete")
 
             logger.info("[marker] Creating model dict...")
@@ -758,7 +748,7 @@ except Exception as e:
         logger.info(f"[pdf] PDF path: {pdf_path}")
         if os.path.exists(pdf_path):
             file_size = os.path.getsize(pdf_path)
-            logger.info(f"[pdf] PDF exists, size: {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+            logger.info(f"[pdf] PDF exists, size: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
         else:
             logger.error(f"[pdf] PDF file does not exist: {pdf_path}")
             return ""
@@ -790,7 +780,7 @@ except Exception as e:
         Runs the CPU-intensive conversion in a thread pool with timeout.
         """
         # Extract OSTI ID from path for caching
-        osti_id = os.path.basename(pdf_path).replace('osti_', '').replace('.pdf', '')
+        osti_id = os.path.basename(pdf_path).replace("osti_", "").replace(".pdf", "")
         cache_key = f"osti:paper:text:{osti_id}"
 
         # Check Redis cache for converted text
@@ -808,8 +798,7 @@ except Exception as e:
             loop = asyncio.get_running_loop()
             with ThreadPoolExecutor(max_workers=1) as executor:
                 text = await asyncio.wait_for(
-                    loop.run_in_executor(executor, self._convert_pdf_sync, pdf_path),
-                    timeout=timeout
+                    loop.run_in_executor(executor, self._convert_pdf_sync, pdf_path), timeout=timeout
                 )
 
             # Cache the converted text (30 day TTL)
@@ -830,9 +819,7 @@ except Exception as e:
 
     def convert_pdf_to_text(self, pdf_path: str) -> str:
         """Synchronous wrapper for backward compatibility."""
-        return asyncio.get_event_loop().run_until_complete(
-            self.convert_pdf_to_text_async(pdf_path)
-        )
+        return asyncio.get_event_loop().run_until_complete(self.convert_pdf_to_text_async(pdf_path))
 
     async def extract_answer_from_paper(
         self,
@@ -867,13 +854,15 @@ except Exception as e:
         llm: Any,
     ) -> str:
         """Synthesize a comprehensive answer from multiple papers."""
-        answers_text = "\n\n".join([
-            f"Paper {i}: {ans['title']}\n"
-            f"Answer: {ans['answer']}\n"
-            f"Evidence: {ans.get('evidence', '')}\n"
-            f"Confidence: {ans.get('confidence', 0.5)}"
-            for i, ans in enumerate(answers, 1)
-        ])
+        answers_text = "\n\n".join(
+            [
+                f"Paper {i}: {ans['title']}\n"
+                f"Answer: {ans['answer']}\n"
+                f"Evidence: {ans.get('evidence', '')}\n"
+                f"Confidence: {ans.get('confidence', 0.5)}"
+                for i, ans in enumerate(answers, 1)
+            ]
+        )
 
         prompt = SYNTHESIZE_ANSWER_PROMPT_TEMPLATE.format(
             question=question,
@@ -944,7 +933,7 @@ except Exception as e:
             status_data = {
                 "message": status_message,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "final": final
+                "final": final,
             }
             # Store latest status with 10-minute TTL
             self.redis_client.set(
@@ -967,7 +956,7 @@ except Exception as e:
         event_queue: EventQueue,
         status_message: str,
         final: bool = False,
-        conversation_id: str = None
+        conversation_id: str = None,
     ) -> None:
         """Helper to send status updates and log progress."""
         # Log the status message for visibility
@@ -980,11 +969,7 @@ except Exception as e:
         await self.send_status_update(
             context=context,
             event_queue=event_queue,
-            state=(
-                TaskState.TASK_STATE_COMPLETED
-                if final
-                else TaskState.TASK_STATE_WORKING
-            ),
+            state=(TaskState.TASK_STATE_COMPLETED if final else TaskState.TASK_STATE_WORKING),
             final=final,
             message=status_message,
         )
@@ -996,12 +981,14 @@ except Exception as e:
         llm: Any,
     ) -> int:
         """Extract discrete facts from answers and store in memory."""
-        answers_text = "\n\n".join([
-            f"Paper: {ans['title']} (OSTI #{ans['osti_id']})\n"
-            f"Answer: {ans['answer']}\n"
-            f"Evidence: {ans.get('evidence', '')}"
-            for ans in answers
-        ])
+        answers_text = "\n\n".join(
+            [
+                f"Paper: {ans['title']} (OSTI #{ans['osti_id']})\n"
+                f"Answer: {ans['answer']}\n"
+                f"Evidence: {ans.get('evidence', '')}"
+                for ans in answers
+            ]
+        )
 
         prompt = EXTRACT_FACTS_PROMPT_TEMPLATE.format(
             question=question,
@@ -1021,7 +1008,7 @@ except Exception as e:
                 # Find source paper details
                 source_paper = next(
                     (ans for ans in answers if ans["osti_id"] == fact_data.get("source_osti_id")),
-                    answers[0] if answers else {}
+                    answers[0] if answers else {},
                 )
 
                 await asyncio.to_thread(
@@ -1072,7 +1059,7 @@ except Exception as e:
             "search_results": [],
             "answers_found": [],
             "status": "generating_query",
-            "timeout_occurred": False
+            "timeout_occurred": False,
         }
 
         # Step 1: Generate search query
@@ -1109,7 +1096,7 @@ except Exception as e:
             # Check timeout before processing each paper
             if check_timeout():
                 log_progress("Approaching timeout, returning partial results...")
-                await send_status( "Approaching timeout, returning partial results...")
+                await send_status("Approaching timeout, returning partial results...")
                 state["timeout_occurred"] = True
                 break
 
@@ -1141,7 +1128,7 @@ except Exception as e:
                 continue
 
             relevant_count += 1
-            short_title = result['title'][:50] + "..." if len(result['title']) > 50 else result['title']
+            short_title = result["title"][:50] + "..." if len(result["title"]) > 50 else result["title"]
             log_progress(f"Paper {relevant_count} relevant: {short_title}")
             await send_status(
                 f"Relevant paper selected for download:\n"
@@ -1158,35 +1145,25 @@ except Exception as e:
             if not pdf_path:
                 result["download_failed"] = True
                 log_progress("  -> Download failed (PDF not available)")
-                await send_status(
-                    f"Download failed for OSTI #{result['osti_id']} ({result['title']})."
-                )
+                await send_status(f"Download failed for OSTI #{result['osti_id']} ({result['title']}).")
                 continue
 
             log_progress("  -> Downloaded successfully")
-            await send_status(
-                f"Downloaded OSTI #{result['osti_id']} ({result['title']})."
-            )
+            await send_status(f"Downloaded OSTI #{result['osti_id']} ({result['title']}).")
 
             # Convert to text (async with timeout)
-            await send_status(
-                f"Converting paper {relevant_count} to text (this may take a few minutes)..."
-            )
+            await send_status(f"Converting paper {relevant_count} to text (this may take a few minutes)...")
 
             paper_text = await self.convert_pdf_to_text_async(pdf_path, timeout=300)
 
             if not paper_text:
                 result["conversion_failed"] = True
                 log_progress("  -> Conversion failed or timed out")
-                await send_status(
-                    f"Conversion failed or timed out for OSTI #{result['osti_id']}."
-                )
+                await send_status(f"Conversion failed or timed out for OSTI #{result['osti_id']}.")
                 continue
 
             log_progress(f"  -> Converted ({len(paper_text)} chars)")
-            await send_status(
-                f"Converted OSTI #{result['osti_id']} to text ({len(paper_text)} chars)."
-            )
+            await send_status(f"Converted OSTI #{result['osti_id']} to text ({len(paper_text)} chars).")
 
             # Extract answer
             await send_status(f"Extracting answer from paper {relevant_count}...")
@@ -1200,15 +1177,17 @@ except Exception as e:
 
             if answer_data.get("answered", False):
                 result["answer_data"] = answer_data
-                state["answers_found"].append({
-                    "osti_id": result["osti_id"],
-                    "title": result["title"],
-                    "url": result["url"],
-                    "answer": answer_data["answer"],
-                    "evidence": answer_data.get("evidence", ""),
-                    "excerpt": answer_data.get("excerpt", ""),
-                    "confidence": answer_data.get("confidence", 0.5)
-                })
+                state["answers_found"].append(
+                    {
+                        "osti_id": result["osti_id"],
+                        "title": result["title"],
+                        "url": result["url"],
+                        "answer": answer_data["answer"],
+                        "evidence": answer_data.get("evidence", ""),
+                        "excerpt": answer_data.get("excerpt", ""),
+                        "confidence": answer_data.get("confidence", 0.5),
+                    }
+                )
                 papers_processed += 1
                 log_progress(f"  -> Extracted answer (confidence: {answer_data.get('confidence', 0.5):.0%})")
                 await send_status(
@@ -1217,9 +1196,7 @@ except Exception as e:
                 )
             else:
                 log_progress("  -> No relevant answer found in paper")
-                await send_status(
-                    f"No useful information found in OSTI #{result['osti_id']}."
-                )
+                await send_status(f"No useful information found in OSTI #{result['osti_id']}.")
 
             # Limit to 5 papers max for performance
             if papers_processed >= 5:
@@ -1263,17 +1240,17 @@ except Exception as e:
                 "papers_analyzed": 0,
                 "progress_log": progress_log,
                 "suggested_queries": suggested_queries,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         log_progress(f"Synthesizing answer from {len(state['answers_found'])} papers...")
-        await send_status( f"Synthesizing answer from {len(state['answers_found'])} papers...")
+        await send_status(f"Synthesizing answer from {len(state['answers_found'])} papers...")
 
         final_answer = await self.synthesize_final_answer(question, state["answers_found"], llm)
 
         # Step 5: Extract and store facts
         log_progress("Storing facts in knowledge base...")
-        await send_status( "Storing new facts in knowledge base...")
+        await send_status("Storing new facts in knowledge base...")
 
         factoids_stored = await self.extract_and_store_facts(
             question,
@@ -1316,15 +1293,11 @@ except Exception as e:
             "progress_log": progress_log,
             "suggested_queries": suggested_queries,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "agent": "OSTI Research Agent"
+            "agent": "OSTI Research Agent",
         }
 
     async def _send_final_result(
-        self,
-        context: RequestContext,
-        event_queue: EventQueue,
-        result: Dict[str, Any],
-        conversation_id: str = None
+        self, context: RequestContext, event_queue: EventQueue, result: Dict[str, Any], conversation_id: str = None
     ) -> None:
         """Send the final result to the event queue so it appears in history."""
         logger.info("[RESULT] Sending final result to event queue")
@@ -1384,7 +1357,9 @@ except Exception as e:
             return error_result
 
         # Step 1: Check memory first
-        await self._send_status(context, event_queue, "Checking knowledge base for existing answers...", False, conversation_id)
+        await self._send_status(
+            context, event_queue, "Checking knowledge base for existing answers...", False, conversation_id
+        )
 
         llm_config = LLMConfig.from_env()
         async with self.llm_client(context, config=llm_config) as llm:
@@ -1412,7 +1387,7 @@ except Exception as e:
                 "provenance": provenance,
                 "cached": True,
                 "suggested_queries": suggested_queries,
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             # Send the result to the event queue so it appears in history
             await self._send_final_result(context, event_queue, result, conversation_id)

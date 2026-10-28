@@ -201,9 +201,7 @@ class ArtifactDebugAgent(PrometheusAgent):
             for skill_result in upstream.values():
                 if isinstance(skill_result, dict):
                     candidate = (
-                        skill_result.get("artifact_id")
-                        or (skill_result.get("artifact") or {}).get("artifact_id")
-                        or ""
+                        skill_result.get("artifact_id") or (skill_result.get("artifact") or {}).get("artifact_id") or ""
                     )
                     if candidate:
                         artifact_id = str(candidate)
@@ -215,9 +213,7 @@ class ArtifactDebugAgent(PrometheusAgent):
                 "message": "Parameter 'artifact_id' is required for SVG to PNG conversion.",
             }
 
-        artifact_catalog = (
-            params.get("artifacts") if isinstance(params.get("artifacts"), list) else None
-        )
+        artifact_catalog = params.get("artifacts") if isinstance(params.get("artifacts"), list) else None
         try:
             source_svg = await self.get_artifact_file_path(
                 artifact_id,
@@ -260,10 +256,7 @@ class ArtifactDebugAgent(PrometheusAgent):
             Path(requested_name).stem if requested_name else Path(source_ref.name).stem,
             fallback="converted",
         )
-        description = str(
-            params.get("description")
-            or f"PNG converted from SVG artifact '{source_ref.name}'."
-        )
+        description = str(params.get("description") or f"PNG converted from SVG artifact '{source_ref.name}'.")
 
         await self.send_status_update(
             context=context,

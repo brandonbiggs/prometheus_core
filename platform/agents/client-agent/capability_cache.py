@@ -14,6 +14,7 @@
 Capability Cache for dynamic agent discovery.
 Caches agent capabilities from registry with TTL-based refresh.
 """
+
 import json
 import logging
 import os
@@ -34,6 +35,7 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 @dataclass
 class AgentCapability:
     """Represents a single capability (skill) from an agent."""
+
     agent_id: str
     agent_name: str
     agent_url: str
@@ -127,11 +129,7 @@ class CapabilityCache:
     def redis_client(self) -> redis.Redis:
         """Lazy Redis connection."""
         if self._redis is None:
-            self._redis = redis.Redis.from_url(
-                self.redis_url,
-                password=self.redis_password,
-                decode_responses=True
-            )
+            self._redis = redis.Redis.from_url(self.redis_url, password=self.redis_password, decode_responses=True)
         return self._redis
 
     def _is_self_capability(self, capability: AgentCapability) -> bool:
@@ -226,9 +224,9 @@ class CapabilityCache:
 
             for agent in agents:
                 try:
-                    agent_id = agent["agent_id"]       # agent_name (registry routing key)
+                    agent_id = agent["agent_id"]  # agent_name (registry routing key)
                     agent_name = agent.get("name", agent_id)
-                    direct_url = agent.get("url", "")   # downstream agent URL (for self-check)
+                    direct_url = agent.get("url", "")  # downstream agent URL (for self-check)
 
                     if is_self_agent(agent_id, direct_url):
                         print(f"Skipping self agent in capability cache: {agent_id} ({direct_url})")
@@ -294,10 +292,7 @@ class CapabilityCache:
                 agent_cards_json = json.dumps(agent_card_records)
                 self.redis_client.set(self.CACHE_KEY, capabilities_json)
                 self.redis_client.set(self.AGENT_CARDS_CACHE_KEY, agent_cards_json)
-                self.redis_client.set(
-                    self.TIMESTAMP_KEY,
-                    datetime.now(timezone.utc).isoformat()
-                )
+                self.redis_client.set(self.TIMESTAMP_KEY, datetime.now(timezone.utc).isoformat())
             except Exception as e:
                 print(f"Warning: Failed to store capabilities in Redis: {e}")
 

@@ -98,9 +98,7 @@ async def _post_upload(*, query: dict, body: bytes = b"file-bytes") -> httpx.Res
 @pytest.mark.asyncio
 async def test_valid_user_token_stamps_verified_user_id():
     token = mint_user_token("alice")
-    resp = await _post_upload(
-        query={"name": "part.step", "conversation_id": "conv-1", "user_token": token}
-    )
+    resp = await _post_upload(query={"name": "part.step", "conversation_id": "conv-1", "user_token": token})
     assert resp.status_code == 200
     assert resp.json()["user_id"] == "alice"
 
@@ -125,9 +123,7 @@ async def test_invalid_user_token_stamps_empty_user_id_not_error():
 @pytest.mark.asyncio
 async def test_expired_user_token_stamps_empty_user_id():
     token = mint_user_token("alice", ttl_seconds=-1)
-    resp = await _post_upload(
-        query={"name": "part.step", "conversation_id": "conv-1", "user_token": token}
-    )
+    resp = await _post_upload(query={"name": "part.step", "conversation_id": "conv-1", "user_token": token})
     assert resp.status_code == 200
     assert resp.json()["user_id"] == ""
 

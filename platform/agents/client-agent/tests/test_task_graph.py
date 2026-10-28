@@ -124,9 +124,7 @@ def test_leaf_completion_marks_terminal(fake_redis: _FakeRedis) -> None:
 
 def test_parent_blocked_while_child_runs(fake_redis: _FakeRedis) -> None:
     task_graph.create_node(task_id="root", conversation_id=CONV, title="ask")
-    task_graph.create_node(
-        task_id="child", conversation_id=CONV, parent_task_id="root", agent="thermal"
-    )
+    task_graph.create_node(task_id="child", conversation_id=CONV, parent_task_id="root", agent="thermal")
 
     # Child starts working → root should be working and waiting on the child.
     task_graph.update_own_state(CONV, "child", own_state="working", message="step 1/10")
@@ -149,12 +147,8 @@ def test_parent_blocked_while_child_runs(fake_redis: _FakeRedis) -> None:
 
 def test_completion_cascades_two_levels(fake_redis: _FakeRedis) -> None:
     task_graph.create_node(task_id="root", conversation_id=CONV)
-    task_graph.create_node(
-        task_id="synth", conversation_id=CONV, parent_task_id="root", agent="synthesis"
-    )
-    task_graph.create_node(
-        task_id="therm", conversation_id=CONV, parent_task_id="synth", agent="thermal"
-    )
+    task_graph.create_node(task_id="synth", conversation_id=CONV, parent_task_id="root", agent="synthesis")
+    task_graph.create_node(task_id="therm", conversation_id=CONV, parent_task_id="synth", agent="thermal")
 
     # Both intermediate and root finished their own work; only the deep leaf runs.
     task_graph.update_own_state(CONV, "root", own_state="completed")
@@ -193,9 +187,7 @@ def test_deepest_blocking_message_surfaces_to_root(fake_redis: _FakeRedis) -> No
         title="Thermal sim",
     )
     task_graph.update_own_state(CONV, "root", own_state="completed")
-    task_graph.update_own_state(
-        CONV, "therm", own_state="working", message="step 142/500"
-    )
+    task_graph.update_own_state(CONV, "therm", own_state="working", message="step 142/500")
 
     root = task_graph.get_node(CONV, "root")
     assert "waiting on Thermal sim" in root.last_status_message
@@ -250,12 +242,8 @@ def test_message_only_progress_publishes_and_percolates(fake_redis: _FakeRedis) 
 
 def test_build_tree_nests_children(fake_redis: _FakeRedis) -> None:
     task_graph.create_node(task_id="root", conversation_id=CONV, title="ask")
-    task_graph.create_node(
-        task_id="a", conversation_id=CONV, parent_task_id="root", agent="corrosion"
-    )
-    task_graph.create_node(
-        task_id="b", conversation_id=CONV, parent_task_id="root", agent="thermal"
-    )
+    task_graph.create_node(task_id="a", conversation_id=CONV, parent_task_id="root", agent="corrosion")
+    task_graph.create_node(task_id="b", conversation_id=CONV, parent_task_id="root", agent="thermal")
 
     tree = task_graph.build_tree(CONV)
     assert len(tree) == 1

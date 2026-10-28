@@ -238,11 +238,13 @@ def _skill_spec(name: str, capability: AgentCapability) -> ToolSpec:
     # Users never type artifact ids: a missing artifact reference is the model's to fill.
     artifact_paths = extract_artifact_field_paths(input_schema)
     user_required = [
-        path for path in extract_required_param_paths(input_schema)
+        path
+        for path in extract_required_param_paths(input_schema)
         if path.split(".", 1)[0] not in ORCHESTRATOR_PARAMS and path not in artifact_paths
     ]
     all_required = [
-        path for path in extract_required_param_paths(input_schema, include_internal=True)
+        path
+        for path in extract_required_param_paths(input_schema, include_internal=True)
         if path.split(".", 1)[0] not in ORCHESTRATOR_PARAMS
     ]
     description = capability.description or capability.skill_name
@@ -493,10 +495,8 @@ def _system_prompt(state: Dict[str, Any], catalog: Mapping[str, ToolSpec]) -> st
         + (f" — {artifact['description']}" if artifact.get("description") else "")
         for artifact in artifacts
     ]
-    return (
-        SYSTEM_PROMPT_TEMPLATE
-        .replace("{artifact_catalog}", "\n".join(lines) or "(none)")
-        .replace("{recent_skill_inputs}", "\n".join(recent_skill_inputs(state, catalog)) or "(none)")
+    return SYSTEM_PROMPT_TEMPLATE.replace("{artifact_catalog}", "\n".join(lines) or "(none)").replace(
+        "{recent_skill_inputs}", "\n".join(recent_skill_inputs(state, catalog)) or "(none)"
     )
 
 
@@ -659,7 +659,9 @@ def _new_call(
     if spec.kind == "ask_user":
         questions = _normalize_questions(call["arguments"].get("questions"))
         if not questions:
-            _finish(call, {"status": "failed", "error": "ask_user needs at least one question with field and question."})
+            _finish(
+                call, {"status": "failed", "error": "ask_user needs at least one question with field and question."}
+            )
             return call
         call["questions"] = questions
         call["status"] = "needs_answer"
@@ -953,7 +955,9 @@ async def _settle_skill_item(
     supplied = {name: call["arguments"][name] for name, source in sources.items() if source != "model"}
     if supplied:
         encoded = json.dumps(supplied, default=str)
-        payload["inputs"] = copy.deepcopy(supplied) if len(encoded) <= SUMMARY_CHARS else _truncate(encoded, SUMMARY_CHARS)
+        payload["inputs"] = (
+            copy.deepcopy(supplied) if len(encoded) <= SUMMARY_CHARS else _truncate(encoded, SUMMARY_CHARS)
+        )
         payload["input_sources"] = dict(sources)
     _finish(call, payload)
 
@@ -1054,7 +1058,9 @@ async def _run_workflow(call: Dict[str, Any], state: Dict[str, Any]) -> None:
         if isinstance(payload, dict) and step_id not in completed:
             params = payload.get("params") or {}
             completed[step_id] = {"status": "succeeded", "result": payload.get("result"), "params": params}
-            _record_step(state, step_keys, step_id, str(payload.get("skill_id") or step_id), params, payload.get("result"))
+            _record_step(
+                state, step_keys, step_id, str(payload.get("skill_id") or step_id), params, payload.get("result")
+            )
     for error in execution.get("errors") or []:
         if error.get("step_id") and error["step_id"] not in completed:
             completed[error["step_id"]] = {"status": "failed", "error": error.get("error")}
@@ -1210,10 +1216,7 @@ def _plan(state: Dict[str, Any], catalog: Mapping[str, ToolSpec]) -> Dict[str, A
         if spec is None:
             continue
         duration += spec.expected_duration_seconds
-        arguments = ", ".join(
-            f"{key}={json.dumps(value, default=str)}"
-            for key, value in call["arguments"].items()
-        )
+        arguments = ", ".join(f"{key}={json.dumps(value, default=str)}" for key, value in call["arguments"].items())
         steps.append(
             {
                 "name": spec.label,

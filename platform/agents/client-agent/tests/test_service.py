@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Service, slash-command, upload, and skill-invocation tests for the client-agent."""
+
 from __future__ import annotations
 
 import asyncio
@@ -45,6 +46,7 @@ def test_configured_max_upload_bytes_rejects_invalid_env(monkeypatch) -> None:
     monkeypatch.setenv("PROMETHEUS_MAX_UPLOAD_BYTES", "-1")
     with pytest.raises(ValueError, match="PROMETHEUS_MAX_UPLOAD_BYTES must be positive"):
         file_upload_handler.configured_max_upload_bytes()
+
 
 def test_runtime_status_stream_emits_store_updates(monkeypatch) -> None:
     emitted = []
@@ -180,7 +182,6 @@ def test_upload_files_to_deeplynx_rejects_staged_upload_size_mismatch(monkeypatc
     assert not meta_path.exists()
 
 
-
 def test_agents_slash_command_lists_registered_agents_without_llm(monkeypatch) -> None:
 
     async def fake_discover_agents():
@@ -216,11 +217,7 @@ def test_agents_slash_command_lists_registered_agents_without_llm(monkeypatch) -
     monkeypatch.setattr(chat_flow, "get_conversation", lambda conversation_id: None)
     monkeypatch.setattr(runtime, "store_status_update", lambda *args, **kwargs: None)
 
-    response = asyncio.run(
-        chat_flow.chat(
-            ConversationRequest(query="/agents", conversation_id="conv-debug")
-        )
-    )
+    response = asyncio.run(chat_flow.chat(ConversationRequest(query="/agents", conversation_id="conv-debug")))
 
     assert response.status == "answer"
     assert "Registered agents (1)" in response.message
@@ -315,11 +312,7 @@ def test_workflows_slash_command_lists_platform_and_agent_workflows(monkeypatch)
     monkeypatch.setattr(chat_flow, "get_conversation", lambda conversation_id: None)
     monkeypatch.setattr(runtime, "store_status_update", lambda *args, **kwargs: None)
 
-    response = asyncio.run(
-        chat_flow.chat(
-            ConversationRequest(query="/workflows", conversation_id="conv-workflows")
-        )
-    )
+    response = asyncio.run(chat_flow.chat(ConversationRequest(query="/workflows", conversation_id="conv-workflows")))
 
     assert response.status == "answer"
     assert "Registered workflows (2)" in response.message
@@ -357,11 +350,7 @@ def test_help_slash_command_lists_builtin_and_workflow_commands(monkeypatch) -> 
     monkeypatch.setattr(chat_flow, "get_conversation", lambda conversation_id: None)
     monkeypatch.setattr(runtime, "store_status_update", lambda *args, **kwargs: None)
 
-    response = asyncio.run(
-        chat_flow.chat(
-            ConversationRequest(query="/help", conversation_id="conv-help")
-        )
-    )
+    response = asyncio.run(chat_flow.chat(ConversationRequest(query="/help", conversation_id="conv-help")))
 
     assert response.status == "answer"
     assert "Available commands (7)" in response.message
@@ -381,8 +370,6 @@ def test_help_slash_command_lists_builtin_and_workflow_commands(monkeypatch) -> 
             }
         ],
     }
-
-
 
 
 class _NullEventQueue:
@@ -475,9 +462,7 @@ def test_execute_detaches_when_agent_declares_long_running(monkeypatch) -> None:
         # working (so the race resolves on the background signal, not chat).
         task_tracking.request_background()
         await asyncio.sleep(0.05)
-        return service_mod.ConversationResponse(
-            conversation_id="conv-bg", status="completed", report="eventually"
-        )
+        return service_mod.ConversationResponse(conversation_id="conv-bg", status="completed", report="eventually")
 
     monkeypatch.setattr(service_mod, "chat", fake_chat)
 
@@ -502,8 +487,6 @@ def test_execute_detaches_when_agent_declares_long_running(monkeypatch) -> None:
 
     assert payload["status"] == "backgrounded"
     assert payload["message_metadata"]["task_id"] == captured["root_id"]
-
-
 
 
 def test_find_tool_for_skill_uses_runtime_tool_cache(monkeypatch) -> None:

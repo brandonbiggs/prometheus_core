@@ -64,9 +64,7 @@ def _client() -> redis.Redis:
 
         _redis_client = create_redis_client(ping=False)
         if _redis_client is None:
-            raise RuntimeError(
-                "Redis client could not be created; check REDIS_URL/REDIS_PASSWORD"
-            )
+            raise RuntimeError("Redis client could not be created; check REDIS_URL/REDIS_PASSWORD")
     return _redis_client
 
 
@@ -195,9 +193,7 @@ def list_roots(conversation_id: str) -> List[str]:
 
 def _publish_event(conversation_id: str, event: Dict[str, Any]) -> None:
     try:
-        _client().publish(
-            events_channel(conversation_id), json.dumps(event, default=str)
-        )
+        _client().publish(events_channel(conversation_id), json.dumps(event, default=str))
     except Exception as exc:
         logger.warning("[TASKGRAPH] Failed to publish event: %s", exc)
 
@@ -351,9 +347,7 @@ def _root_of(conversation_id: str, task_id: str) -> str:
     return current
 
 
-def _deepest_blocking_message(
-    conversation_id: str, node: TaskNode, depth: int = 0
-) -> str:
+def _deepest_blocking_message(conversation_id: str, node: TaskNode, depth: int = 0) -> str:
     """Derive a human message naming the deepest still-running descendant."""
     if depth > _MAX_PERCOLATE_DEPTH:
         return node.last_status_message
@@ -491,20 +485,12 @@ def build_tree(conversation_id: str) -> List[Dict[str, Any]]:
         node = nodes[task_id]
         return {
             **node.to_dict(),
-            "children": [
-                child
-                for cid in node.child_task_ids
-                if (child := render(cid, seen)) is not None
-            ],
+            "children": [child for cid in node.child_task_ids if (child := render(cid, seen)) is not None],
         }
 
     seen: set[str] = set()
     roots = [r for r in list_roots(conversation_id) if r in nodes]
     # Include any orphan nodes whose parent is missing, so nothing is hidden.
-    roots += [
-        n.task_id
-        for n in nodes.values()
-        if not n.parent_task_id and n.task_id not in roots
-    ]
+    roots += [n.task_id for n in nodes.values() if not n.parent_task_id and n.task_id not in roots]
     trees = [tree for r in roots if (tree := render(r, seen)) is not None]
     return trees

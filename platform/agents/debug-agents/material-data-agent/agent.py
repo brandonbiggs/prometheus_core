@@ -17,6 +17,7 @@ small dataset generated with an open LLM model. Use this only for
 orchestration debugging!
 Implements A2A protocol using prometheus_api with Bearer token authentication
 """
+
 import json
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -50,20 +51,23 @@ MATERIAL_DATABASE = {
         "name": "Stainless Steel 316 - Primary Coolant Piping",
         "specification": "ASTM A312 Type 316",
         "composition": {
-            "C": 0.08, "Cr": 17.0, "Ni": 12.0, "Mo": 2.5,
-            "Mn": 2.0, "Si": 1.0, "P": 0.045, "S": 0.030, "Fe": "balance"
+            "C": 0.08,
+            "Cr": 17.0,
+            "Ni": 12.0,
+            "Mo": 2.5,
+            "Mn": 2.0,
+            "Si": 1.0,
+            "P": 0.045,
+            "S": 0.030,
+            "Fe": "balance",
         },
         "mechanical_properties": {
             "yield_strength_mpa": 290,
             "tensile_strength_mpa": 580,
             "elongation_percent": 40,
-            "hardness_hb": 217
+            "hardness_hb": 217,
         },
-        "thermal_properties": {
-            "conductivity_w_mk": 16.3,
-            "expansion_coeff_per_k": 15.9e-6,
-            "specific_heat_j_kgk": 500
-        },
+        "thermal_properties": {"conductivity_w_mk": 16.3, "expansion_coeff_per_k": 15.9e-6, "specific_heat_j_kgk": 500},
         "installation_date": "2018-06-15",
         "design_life_years": 40,
         "location": "Primary coolant loop piping",
@@ -71,28 +75,31 @@ MATERIAL_DATABASE = {
             "temperature_range_c": [280, 343],
             "pressure_mpa": 15.5,
             "coolant": "Light water (H2O) with boric acid",
-            "radiation_field": "Moderate neutron flux"
-        }
+            "radiation_field": "Moderate neutron flux",
+        },
     },
     "SS316L": {
         "material_id": "SS316L",
         "name": "Stainless Steel 316L - Heat Exchanger",
         "specification": "ASTM A240 Type 316L",
         "composition": {
-            "C": 0.03, "Cr": 17.0, "Ni": 12.0, "Mo": 2.5,
-            "Mn": 2.0, "Si": 1.0, "P": 0.045, "S": 0.030, "Fe": "balance"
+            "C": 0.03,
+            "Cr": 17.0,
+            "Ni": 12.0,
+            "Mo": 2.5,
+            "Mn": 2.0,
+            "Si": 1.0,
+            "P": 0.045,
+            "S": 0.030,
+            "Fe": "balance",
         },
         "mechanical_properties": {
             "yield_strength_mpa": 270,
             "tensile_strength_mpa": 560,
             "elongation_percent": 45,
-            "hardness_hb": 201
+            "hardness_hb": 201,
         },
-        "thermal_properties": {
-            "conductivity_w_mk": 16.3,
-            "expansion_coeff_per_k": 15.9e-6,
-            "specific_heat_j_kgk": 500
-        },
+        "thermal_properties": {"conductivity_w_mk": 16.3, "expansion_coeff_per_k": 15.9e-6, "specific_heat_j_kgk": 500},
         "installation_date": "2015-03-20",
         "design_life_years": 40,
         "location": "Heat exchanger tubes",
@@ -100,28 +107,30 @@ MATERIAL_DATABASE = {
             "temperature_range_c": [200, 320],
             "pressure_mpa": 10.5,
             "coolant": "Demineralized water",
-            "radiation_field": "Low"
-        }
+            "radiation_field": "Low",
+        },
     },
     "SS304": {
         "material_id": "SS304",
         "name": "Stainless Steel 304 - Structural Components",
         "specification": "ASTM A240 Type 304",
         "composition": {
-            "C": 0.08, "Cr": 19.0, "Ni": 9.0,
-            "Mn": 2.0, "Si": 1.0, "P": 0.045, "S": 0.030, "Fe": "balance"
+            "C": 0.08,
+            "Cr": 19.0,
+            "Ni": 9.0,
+            "Mn": 2.0,
+            "Si": 1.0,
+            "P": 0.045,
+            "S": 0.030,
+            "Fe": "balance",
         },
         "mechanical_properties": {
             "yield_strength_mpa": 215,
             "tensile_strength_mpa": 505,
             "elongation_percent": 40,
-            "hardness_hb": 201
+            "hardness_hb": 201,
         },
-        "thermal_properties": {
-            "conductivity_w_mk": 16.2,
-            "expansion_coeff_per_k": 17.3e-6,
-            "specific_heat_j_kgk": 500
-        },
+        "thermal_properties": {"conductivity_w_mk": 16.2, "expansion_coeff_per_k": 17.3e-6, "specific_heat_j_kgk": 500},
         "installation_date": "2012-09-10",
         "design_life_years": 40,
         "location": "Containment structure internals",
@@ -129,28 +138,31 @@ MATERIAL_DATABASE = {
             "temperature_range_c": [20, 250],
             "pressure_mpa": 0.4,
             "coolant": "Air/steam atmosphere",
-            "radiation_field": "Very low"
-        }
+            "radiation_field": "Very low",
+        },
     },
     "SS347": {
         "material_id": "SS347",
         "name": "Stainless Steel 347 - High Temperature Piping",
         "specification": "ASTM A312 Type 347",
         "composition": {
-            "C": 0.08, "Cr": 18.0, "Ni": 11.0, "Nb": 0.8,
-            "Mn": 2.0, "Si": 1.0, "P": 0.045, "S": 0.030, "Fe": "balance"
+            "C": 0.08,
+            "Cr": 18.0,
+            "Ni": 11.0,
+            "Nb": 0.8,
+            "Mn": 2.0,
+            "Si": 1.0,
+            "P": 0.045,
+            "S": 0.030,
+            "Fe": "balance",
         },
         "mechanical_properties": {
             "yield_strength_mpa": 240,
             "tensile_strength_mpa": 550,
             "elongation_percent": 40,
-            "hardness_hb": 201
+            "hardness_hb": 201,
         },
-        "thermal_properties": {
-            "conductivity_w_mk": 16.3,
-            "expansion_coeff_per_k": 17.8e-6,
-            "specific_heat_j_kgk": 500
-        },
+        "thermal_properties": {"conductivity_w_mk": 16.3, "expansion_coeff_per_k": 17.8e-6, "specific_heat_j_kgk": 500},
         "installation_date": "2016-11-05",
         "design_life_years": 40,
         "location": "Steam generator feedwater piping",
@@ -158,9 +170,9 @@ MATERIAL_DATABASE = {
             "temperature_range_c": [250, 400],
             "pressure_mpa": 18.0,
             "coolant": "High-temperature water/steam",
-            "radiation_field": "Low"
-        }
-    }
+            "radiation_field": "Low",
+        },
+    },
 }
 
 
@@ -271,9 +283,7 @@ class MaterialDataAgent(PrometheusAgent):
         # get_material_data (and any unknown skill) → full profile + interpretation.
         return await self._material_data(material_id, material, context, event_queue)
 
-    async def _list_materials(
-        self, context: RequestContext, event_queue: EventQueue
-    ) -> Dict[str, Any]:
+    async def _list_materials(self, context: RequestContext, event_queue: EventQueue) -> Dict[str, Any]:
         await self.send_status_update(
             context=context,
             event_queue=event_queue,

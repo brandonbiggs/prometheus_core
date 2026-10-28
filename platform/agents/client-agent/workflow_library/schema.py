@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Workflow definition schema for YAML-based workflow templates."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

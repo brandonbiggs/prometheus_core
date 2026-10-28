@@ -17,6 +17,7 @@ Importing this module installs a minimal stand-in for ``prometheus_api.agent``
 when the real module cannot be imported, so an environment with the agent
 runtime (the container) tests against the real one.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -34,9 +35,7 @@ def _importable(name: str) -> bool:
 
 
 if not _importable("prometheus_api.agent"):
-    prometheus_api_module = sys.modules.get(
-        "prometheus_api", types.ModuleType("prometheus_api")
-    )
+    prometheus_api_module = sys.modules.get("prometheus_api", types.ModuleType("prometheus_api"))
     agent_api_module = types.ModuleType("prometheus_api.agent")
 
     class _ArtifactReference:

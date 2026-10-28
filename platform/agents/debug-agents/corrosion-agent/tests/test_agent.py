@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Input resolution for the corrosion agent."""
+
 import importlib.util
 from pathlib import Path
 

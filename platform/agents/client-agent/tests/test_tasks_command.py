@@ -42,9 +42,18 @@ def populated(monkeypatch) -> _FakeRedis:
     # root → corrosion (done) + thermal (still working)
     task_graph.create_node(task_id="root", conversation_id=CONV, title="analyze assembly-7")
     task_graph.update_own_state(CONV, "root", own_state="working")
-    task_graph.create_node(task_id="corr", conversation_id=CONV, parent_task_id="root", agent="corrosion", skill="corrosion_rate")
+    task_graph.create_node(
+        task_id="corr", conversation_id=CONV, parent_task_id="root", agent="corrosion", skill="corrosion_rate"
+    )
     task_graph.update_own_state(CONV, "corr", own_state="completed")
-    task_graph.create_node(task_id="therm", conversation_id=CONV, parent_task_id="root", agent="thermal", skill="thermal_sim", title="Thermal sim")
+    task_graph.create_node(
+        task_id="therm",
+        conversation_id=CONV,
+        parent_task_id="root",
+        agent="thermal",
+        skill="thermal_sim",
+        title="Thermal sim",
+    )
     task_graph.update_own_state(CONV, "therm", own_state="working", message="step 142/500")
     return fake
 

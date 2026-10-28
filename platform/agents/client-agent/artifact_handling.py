@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Conversation artifact catalog helpers and artifact-reference schema metadata."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -71,7 +72,9 @@ def merge_artifact_catalogs(
     """Merge two external artifact catalogs using artifact_id as the key."""
     merged: List[Dict[str, Any]] = []
     seen_ids = set()
-    for item in summarize_artifacts_for_context(existing_artifacts) + summarize_artifacts_for_context(incoming_artifacts):
+    for item in summarize_artifacts_for_context(existing_artifacts) + summarize_artifacts_for_context(
+        incoming_artifacts
+    ):
         artifact_id = item["artifact_id"]
         if artifact_id in seen_ids:
             continue

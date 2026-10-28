@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Health checks for agent-provided workflow templates."""
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -66,10 +67,7 @@ async def verify_workflow_source_health(workflow: Any, *, timeout_seconds: float
         return f"Workflow provider agent '{label}' is unavailable: {exc}"
 
     if response.status_code < 200 or response.status_code >= 300:
-        return (
-            f"Workflow provider agent '{label}' is unhealthy: "
-            f"GET {health_url} returned {response.status_code}."
-        )
+        return f"Workflow provider agent '{label}' is unhealthy: GET {health_url} returned {response.status_code}."
     try:
         payload = response.json()
     except ValueError:

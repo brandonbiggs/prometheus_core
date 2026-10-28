@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Unit tests for workflow library compile/execute behavior."""
+
 from __future__ import annotations
 
 import asyncio
@@ -55,10 +56,6 @@ def _capability(skill_id: str, input_schema: Dict[str, Any] | None = None) -> _C
 def _compile(raw: Dict[str, Any]) -> Any:
     capabilities = {step["skill_id"]: _capability(step["skill_id"]) for step in raw.get("steps", [])}
     return compile_workflow(raw=raw, source_path=Path("test.yaml"), capabilities_by_skill=capabilities, strict=True)
-
-
-
-
 
 
 def test_compile_detects_dependency_cycles() -> None:
@@ -628,8 +625,7 @@ def test_executor_collects_all_parallel_input_required_steps() -> None:
     assert len(result["input_required_steps"]) == 2
     assert {entry["step_id"] for entry in result["input_required_steps"]} == {"first", "second"}
     assert {
-        (entry["_task_graph_root_id"], entry["_task_graph_node_id"])
-        for entry in result["input_required_steps"]
+        (entry["_task_graph_root_id"], entry["_task_graph_node_id"]) for entry in result["input_required_steps"]
     } == {
         ("root-1", "node-skill_a"),
         ("root-1", "node-skill_b"),
@@ -708,7 +704,12 @@ def test_executor_continues_from_completed_steps() -> None:
             "steps": [
                 {"id": "author", "skill_id": "author_skill", "outputs": [{"from": "result", "to_context": "authored"}]},
                 {"id": "broken", "skill_id": "broken_skill"},
-                {"id": "mesh", "skill_id": "mesh_skill", "depends_on": ["author"], "params": {"shape": {"from": "context.authored.shape"}}},
+                {
+                    "id": "mesh",
+                    "skill_id": "mesh_skill",
+                    "depends_on": ["author"],
+                    "params": {"shape": {"from": "context.authored.shape"}},
+                },
                 {"id": "report", "skill_id": "report_skill", "depends_on": ["broken"]},
             ],
         }
@@ -732,5 +733,10 @@ def test_executor_continues_from_completed_steps() -> None:
     assert [skill for skill, _ in invoked] == ["mesh_skill"]
     assert invoked[0][1]["shape"] == "cylinder"
     assert result["step_results"]["mesh"]["params"] == {"shape": "cylinder"}
-    assert result["step_statuses"] == {"author": "succeeded", "broken": "failed", "mesh": "succeeded", "report": "blocked"}
+    assert result["step_statuses"] == {
+        "author": "succeeded",
+        "broken": "failed",
+        "mesh": "succeeded",
+        "report": "blocked",
+    }
     assert result["errors"] == [{"step_id": "broken", "skill_id": "broken_skill", "error": "boom"}]

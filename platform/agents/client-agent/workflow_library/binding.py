@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Typed parameter binding for workflow step execution."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Tuple

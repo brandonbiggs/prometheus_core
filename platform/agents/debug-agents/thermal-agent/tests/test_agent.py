@@ -63,9 +63,10 @@ def test_thermal_agent_reads_inputs_from_params():
     resolve = ThermalAnalysisAgent._resolve_inputs
 
     assert resolve({"material_id": "SS316", "context": {"temperature_c": 300}})["temperature_c"] == 300
-    assert resolve({"material_id": "SS316", "temperature_c": 450, "context": {"temperature_c": 300}})[
-        "temperature_c"
-    ] == 450
+    assert (
+        resolve({"material_id": "SS316", "temperature_c": 450, "context": {"temperature_c": 300}})["temperature_c"]
+        == 450
+    )
     assert resolve({"material_id": "SS316", "context": "not a dict"})["temperature_c"] is None
 
 

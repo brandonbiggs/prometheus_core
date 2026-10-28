@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Unit tests for artifact catalog helpers."""
+
 from __future__ import annotations
 
 

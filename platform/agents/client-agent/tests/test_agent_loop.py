@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Tool-calling orchestration loop: chaining, pauses, resumption, transcript validity."""
+
 from __future__ import annotations
 
 import asyncio
@@ -179,9 +180,7 @@ def harness(monkeypatch):
     monkeypatch.setattr(chat_flow, "store_conversation", save)
     monkeypatch.setattr(runtime, "store_status_update", lambda *args, **kwargs: None)
     monkeypatch.setattr(runtime, "ENABLE_WORKFLOW_LIBRARY", False)
-    monkeypatch.setattr(
-        agent_loop, "get_capability_cache", lambda: SimpleNamespace(get_capabilities=get_capabilities)
-    )
+    monkeypatch.setattr(agent_loop, "get_capability_cache", lambda: SimpleNamespace(get_capabilities=get_capabilities))
     monkeypatch.setattr(agent_loop, "invoke_skill", fake_invoke)
 
     def script(steps: List[Any]) -> ScriptedLLM:
@@ -342,9 +341,10 @@ def test_independent_calls_in_one_turn_all_run_and_answer_in_order(harness) -> N
     assert sorted(params["material_id"] for _, params in harness.invocations) == ["SS316", "SS347"]
     tool_messages = [m for m in llm.requests[1]["messages"] if m["role"] == "tool"]
     assert [m["tool_call_id"] for m in tool_messages] == ["a", "b"]
-    assert sorted(
-        (key, result["answer"]) for key, result in response.tool_results.items()
-    ) == [("analyze_thermal", "SS316 ok"), ("analyze_thermal#2", "SS347 ok")]
+    assert sorted((key, result["answer"]) for key, result in response.tool_results.items()) == [
+        ("analyze_thermal", "SS316 ok"),
+        ("analyze_thermal#2", "SS347 ok"),
+    ]
     assert_transcript_valid(harness.store[CONV]["llm_messages"])
 
 
@@ -497,7 +497,14 @@ def test_form_answers_are_validated_before_the_call_runs() -> None:
     state: Dict[str, Any] = {
         "context": {},
         "pending_calls": [
-            {"id": "c1", "name": spec.name, "kind": "skill", "arguments": {}, "status": "needs_args", "missing": ["artifact_id"]}
+            {
+                "id": "c1",
+                "name": spec.name,
+                "kind": "skill",
+                "arguments": {},
+                "status": "needs_args",
+                "missing": ["artifact_id"],
+            }
         ],
     }
 
@@ -828,7 +835,9 @@ def test_tool_result_bounds_a_large_supplied_input(harness) -> None:
     replies = iter(
         [
             {
-                "input_required": {"missing_inputs": [{"name": "notes", "type": "string", "resolvable_from_context": True}]},
+                "input_required": {
+                    "missing_inputs": [{"name": "notes", "type": "string", "resolvable_from_context": True}]
+                },
                 "_a2a_task_id": "task-1",
             },
             {"result": {"answer": "Done."}},
@@ -1005,9 +1014,7 @@ def test_reply_without_upload_to_ask_user_adds_no_note(harness) -> None:
 def test_turn_limit_ends_with_an_error_and_a_valid_transcript(harness, monkeypatch) -> None:
     monkeypatch.setattr(agent_loop, "MAX_LLM_TURNS", 2)
     harness.results.update(create_svg_artifact=svg_result)
-    harness.script(
-        [reply(calls=[tool_call("create_svg_artifact", {"word": "x"}, f"c{i}")]) for i in range(2)]
-    )
+    harness.script([reply(calls=[tool_call("create_svg_artifact", {"word": "x"}, f"c{i}")]) for i in range(2)])
 
     response = send(query="loop forever")
 
@@ -1220,7 +1227,9 @@ def _install_workflow(
     )
     executed: List[Dict[str, Any]] = []
 
-    async def fake_execute_workflow(workflow, input_params, context, invoke_skill, conversation_id, completed_steps=None):
+    async def fake_execute_workflow(
+        workflow, input_params, context, invoke_skill, conversation_id, completed_steps=None
+    ):
         executed.append(
             {
                 "version": workflow.definition.version,
@@ -1532,7 +1541,7 @@ def test_llm_view_repairs_a_transcript_interleaved_by_another_turn() -> None:
         {"role": "user", "content": "other", "turn_id": "B", "turn_started_at": 2.0},
         {"role": "assistant", "content": None, "tool_calls": [other], "turn_id": "B", "turn_started_at": 2.0},
         # A resumed in turn C: its result now sits after B's block.
-        {"role": "tool", "tool_call_id": "c1", "content": "{\"status\": \"succeeded\"}", "turn_id": "C"},
+        {"role": "tool", "tool_call_id": "c1", "content": '{"status": "succeeded"}', "turn_id": "C"},
         {"role": "tool", "tool_call_id": "orphan", "content": "{}", "turn_id": "C"},
     ]
 
@@ -1626,7 +1635,5 @@ def test_early_store_failure_keeps_the_turn(harness, monkeypatch, caplog) -> Non
         ("user", "Start a new chat"),
         ("assistant", "Hello! How can I help?"),
     ]
-    warnings = [
-        r for r in caplog.records if r.name == "orchestrator.chat_flow" and r.levelno == logging.WARNING
-    ]
+    warnings = [r for r in caplog.records if r.name == "orchestrator.chat_flow" and r.levelno == logging.WARNING]
     assert any(CONV in r.getMessage() for r in warnings), "no warning names the conversation id"
