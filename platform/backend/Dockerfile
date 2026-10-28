@@ -26,15 +26,13 @@ RUN --mount=type=bind,from=certs,target=/tmp/certs \
 RUN --mount=type=cache,id=prometheus-uv-cache,target=/root/.cache/uv,sharing=locked \
     --mount=type=bind,from=sdk,source=pyproject.toml,target=/src/pyproject.toml \
     --mount=type=bind,from=sdk,source=uv.lock,target=/src/uv.lock \
-    cd /src && \
-    uv export --frozen --no-dev --no-emit-project > /tmp/sdk-requirements.txt && \
+    uv export --project /src --frozen --no-dev --no-emit-project > /tmp/sdk-requirements.txt && \
     uv pip install -r /tmp/sdk-requirements.txt && \
     rm /tmp/sdk-requirements.txt
 
 # prometheus_api itself, into site-packages
 RUN --mount=type=bind,from=sdk,source=pyproject.toml,target=/src/pyproject.toml \
     --mount=type=bind,from=sdk,source=prometheus_api,target=/src/prometheus_api/ \
-    cd /src && \
     uv pip install --no-deps /src
 
 WORKDIR /app

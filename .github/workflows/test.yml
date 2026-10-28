@@ -98,6 +98,64 @@ jobs:
       - name: Check
         run: python3 platform/scripts/add_markings.py --check
 
+  hadolint-shellcheck:
+    # hadolint on every Dockerfile and shellcheck on every shell script, found
+    # by name or shebang. Config is in .hadolint.yaml
+    name: "hadolint + shellcheck"
+    runs-on: ubuntu-26.04
+    env:
+      # Syntax-highlighting fixtures for the code-render agent, not real files
+      EXCLUDE: ":(exclude)platform/agents/debug-agents/code-render-debug-agent/samples/"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install hadolint and shellcheck
+        env:
+          HADOLINT_VERSION: v2.15.1
+          HADOLINT_SHA256: c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507
+          SHELLCHECK_VERSION: v0.11.0
+          SHELLCHECK_SHA256: b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+        # GITHUB_PATH only gets the fixed directory created here, which holds
+        # just the checksum-verified binaries; no input reaches it
+        run: | # zizmor: ignore[github-env]
+          bin="$RUNNER_TEMP/lint-tools"
+          mkdir -p "$bin"
+          cd "$RUNNER_TEMP"
+          fetch() {
+            curl -sSfL -o "$2" "$1"
+            echo "$3  $2" | sha256sum -c
+          }
+          fetch "https://github.com/hadolint/hadolint/releases/download/$HADOLINT_VERSION/hadolint-linux-x86_64" \
+            hadolint "$HADOLINT_SHA256"
+          install -m 755 hadolint "$bin/hadolint"
+          fetch "https://github.com/koalaman/shellcheck/releases/download/$SHELLCHECK_VERSION/shellcheck-$SHELLCHECK_VERSION.linux.x86_64.tar.gz" \
+            shellcheck.tgz "$SHELLCHECK_SHA256"
+          tar -xzf shellcheck.tgz -C "$bin" --strip-components 1 "shellcheck-$SHELLCHECK_VERSION/shellcheck"
+          echo "$bin" >> "$GITHUB_PATH"
+      - name: hadolint
+        run: |
+          hadolint --version
+          mapfile -t files < <(git ls-files -- '*Dockerfile' '*Dockerfile.*' '*.Dockerfile' "$EXCLUDE")
+          printf '%s\n' "${files[@]}"
+          [ "${#files[@]}" -gt 0 ] || { echo "::error::No Dockerfiles found"; exit 1; }
+          hadolint "${files[@]}"
+      - name: shellcheck
+        if: ${{ !cancelled() }}
+        run: |
+          shellcheck --version
+          files=()
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              *.sh|*.bash) files+=("$f") ;;
+              *) head -n1 "$f" | grep -qE '^#!.*[/ ](ba|da|k)?sh( |$)' && files+=("$f") ;;
+            esac
+          done < <(git ls-files -z -- . "$EXCLUDE")
+          printf '%s\n' "${files[@]}"
+          [ "${#files[@]}" -gt 0 ] || { echo "::error::No shell scripts found"; exit 1; }
+          shellcheck "${files[@]}"
+
   k3d-cluster:
     name: "k3d: cluster targets"
     needs: gitleaks
