@@ -91,7 +91,7 @@ Pytest configuration lives in `pyproject.toml`. Test files, classes, and functio
 
 ## Commit & Pull Request Guidelines
 
-Recent commits use short, direct summaries such as `fix tag ids` or `Cleaned up docs`. Keep commit subjects concise and focused on one change. For pull requests, include a brief description, test commands run, linked issue or context, and note any credential, environment, Docker image, or DeepLynx behavior changes. Add screenshots only for documentation or UI-facing changes.
+Follow the commit message format in the root `CONTRIBUTING.md`: a short imperative summary such as `Stop reading LLM API keys from A2A requests`, then a body explaining what changed and why. Keep each commit focused on one change. For pull requests, include a brief description, test commands run, linked issue or context, and note any credential, environment, Docker image, or DeepLynx behavior changes. Add screenshots only for documentation or UI-facing changes.
 
 ## Security & Configuration Tips
 
