@@ -4,6 +4,9 @@ Prometheus is a collaborative effort and we welcome contributions: bug reports,
 fixes, new agents, documentation, and ideas. This guide covers how to propose a
 change and what we look for before merging it.
 
+[DEVELOPMENT.md](DEVELOPMENT.md) goes further: how to scope and split work,
+stacked pull requests, writing the description, review, and interface changes.
+
 Everyone taking part in this project is expected to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
