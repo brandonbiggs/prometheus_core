@@ -13,7 +13,7 @@
 """Typed parameter binding for workflow step execution."""
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 
 def get_path(data: Any, path: str) -> Any:

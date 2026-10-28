@@ -19,6 +19,7 @@ from dataclasses import dataclass
 import json
 import logging
 import os
+import socket as _socket
 import uuid
 from typing import Any, Dict, List, Literal, Optional
 
@@ -31,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 REGISTRY_URL = PrometheusAgent.registry_url()
 AGENT_SECRET = os.getenv("AGENT_SECRET", "")
-import socket as _socket
 
 _AGENT_PORT = (os.getenv("AGENT_PORT") or "8000").strip()
 SELF_AGENT_URL = (os.getenv("EXTERNAL_AGENT_URL") or f"http://{_socket.gethostname()}:{_AGENT_PORT}").rstrip("/")

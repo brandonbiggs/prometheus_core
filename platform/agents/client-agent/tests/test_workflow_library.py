@@ -14,17 +14,12 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Dict
 
 import pytest
-
-CLIENT_AGENT_DIR = Path(__file__).resolve().parents[1]
-if str(CLIENT_AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(CLIENT_AGENT_DIR))
 
 from workflow_library.compiler import WorkflowCompileError, compile_workflow
 from workflow_library.executor import execute_workflow

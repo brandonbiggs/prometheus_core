@@ -15,15 +15,9 @@
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
-
-CLIENT_AGENT_DIR = Path(__file__).resolve().parents[1]
-if str(CLIENT_AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(CLIENT_AGENT_DIR))
 
 from workflow_library import health
 

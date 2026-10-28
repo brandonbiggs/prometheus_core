@@ -538,7 +538,7 @@ class OSTIResearchAgent(PrometheusAgent):
 
                 # Safety limit to prevent infinite loops
                 if page > 5:
-                    logger.info(f"[OSTI API] Reached page limit, stopping")
+                    logger.info("[OSTI API] Reached page limit, stopping")
                     break
 
             except Exception as e:
@@ -575,7 +575,6 @@ class OSTIResearchAgent(PrometheusAgent):
     def download_paper(self, osti_id: str) -> Optional[str]:
         """Download paper from OSTI with Redis caching to avoid repeat downloads."""
         filepath = f'/tmp/osti_{osti_id}.pdf'
-        cache_key = f"osti:paper:pdf:{osti_id}"
 
         # Check if file exists locally first
         if os.path.exists(filepath):
@@ -664,7 +663,6 @@ class OSTIResearchAgent(PrometheusAgent):
     def _convert_pdf_with_marker_subprocess(self, pdf_path: str, timeout: int = 180) -> str:
         """Run marker conversion in a subprocess with hard timeout."""
         import subprocess
-        import tempfile
 
         # Create a small Python script to run marker
         script = f'''
@@ -725,27 +723,27 @@ except Exception as e:
             os.environ["OMP_NUM_THREADS"] = "1"
             os.environ["MKL_NUM_THREADS"] = "1"
 
-            logger.info(f"[marker] Importing marker modules (CPU mode)...")
+            logger.info("[marker] Importing marker modules (CPU mode)...")
             from marker.converters.pdf import PdfConverter
             from marker.models import create_model_dict
             from marker.output import text_from_rendered
-            logger.info(f"[marker] Imports complete")
+            logger.info("[marker] Imports complete")
 
-            logger.info(f"[marker] Creating model dict...")
+            logger.info("[marker] Creating model dict...")
             model_dict = create_model_dict()
-            logger.info(f"[marker] Model dict created")
+            logger.info("[marker] Model dict created")
 
-            logger.info(f"[marker] Creating PdfConverter...")
+            logger.info("[marker] Creating PdfConverter...")
             converter = PdfConverter(artifact_dict=model_dict)
-            logger.info(f"[marker] PdfConverter created")
+            logger.info("[marker] PdfConverter created")
 
             logger.info(f"[marker] Calling converter({pdf_path})...")
-            logger.info(f"[marker] This may take several minutes for large PDFs...")
+            logger.info("[marker] This may take several minutes for large PDFs...")
 
             # Call converter - this is where it hangs
             rendered = converter(pdf_path)
 
-            logger.info(f"[marker] Conversion returned, extracting text...")
+            logger.info("[marker] Conversion returned, extracting text...")
             text, _, images = text_from_rendered(rendered)
             logger.info(f"[marker] Text extracted: {len(text) if text else 0} chars")
             return text or ""
@@ -766,16 +764,16 @@ except Exception as e:
             return ""
 
         # Try PyMuPDF first - it's fast and reliable
-        logger.info(f"[pdf] Trying PyMuPDF extraction...")
+        logger.info("[pdf] Trying PyMuPDF extraction...")
         text = self._convert_pdf_with_pymupdf(pdf_path)
 
         if text and len(text.strip()) > 100:
-            logger.info(f"[pdf] PyMuPDF extraction successful")
+            logger.info("[pdf] PyMuPDF extraction successful")
             return text
 
         # PyMuPDF got no/little text - try marker as fallback
         logger.warning(f"[pdf] PyMuPDF got insufficient text ({len(text) if text else 0} chars)")
-        logger.info(f"[pdf] Trying marker library as fallback...")
+        logger.info("[pdf] Trying marker library as fallback...")
 
         marker_text = self._convert_pdf_with_marker_subprocess(pdf_path, timeout=180)
 
@@ -783,7 +781,7 @@ except Exception as e:
             logger.info(f"[pdf] Marker extraction successful: {len(marker_text)} chars")
             return marker_text
 
-        logger.warning(f"[pdf] Both PyMuPDF and marker failed to extract text")
+        logger.warning("[pdf] Both PyMuPDF and marker failed to extract text")
         return text or ""
 
     async def convert_pdf_to_text_async(self, pdf_path: str, timeout: int = 300) -> str:
@@ -1087,7 +1085,7 @@ except Exception as e:
         await send_status(f"OSTI search query: {search_query}")
 
         # Step 2: Search OSTI
-        log_progress(f"Searching OSTI database...")
+        log_progress("Searching OSTI database...")
         await send_status(f"Searching OSTI database for: '{search_query}'...")
 
         search_results = await asyncio.to_thread(self.search_osti, search_query, max_results=15)
@@ -1159,13 +1157,13 @@ except Exception as e:
 
             if not pdf_path:
                 result["download_failed"] = True
-                log_progress(f"  -> Download failed (PDF not available)")
+                log_progress("  -> Download failed (PDF not available)")
                 await send_status(
                     f"Download failed for OSTI #{result['osti_id']} ({result['title']})."
                 )
                 continue
 
-            log_progress(f"  -> Downloaded successfully")
+            log_progress("  -> Downloaded successfully")
             await send_status(
                 f"Downloaded OSTI #{result['osti_id']} ({result['title']})."
             )
@@ -1179,7 +1177,7 @@ except Exception as e:
 
             if not paper_text:
                 result["conversion_failed"] = True
-                log_progress(f"  -> Conversion failed or timed out")
+                log_progress("  -> Conversion failed or timed out")
                 await send_status(
                     f"Conversion failed or timed out for OSTI #{result['osti_id']}."
                 )
@@ -1218,14 +1216,14 @@ except Exception as e:
                     f"(confidence {answer_data.get('confidence', 0.5):.0%})."
                 )
             else:
-                log_progress(f"  -> No relevant answer found in paper")
+                log_progress("  -> No relevant answer found in paper")
                 await send_status(
                     f"No useful information found in OSTI #{result['osti_id']}."
                 )
 
             # Limit to 5 papers max for performance
             if papers_processed >= 5:
-                log_progress(f"Reached paper limit (5), stopping search")
+                log_progress("Reached paper limit (5), stopping search")
                 break
 
         # Step 4: Synthesize final answer
@@ -1329,7 +1327,7 @@ except Exception as e:
         conversation_id: str = None
     ) -> None:
         """Send the final result to the event queue so it appears in history."""
-        logger.info(f"[RESULT] Sending final result to event queue")
+        logger.info("[RESULT] Sending final result to event queue")
 
         # Store final status in Redis
         status_id = conversation_id or context.context_id
