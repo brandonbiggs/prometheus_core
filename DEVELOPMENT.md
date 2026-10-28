@@ -4,6 +4,8 @@
 `devel`, run the checks, open a pull request. This guide explains how we scope
 work, structure pull requests, and review them, and why. It applies to
 maintainers and outside contributors alike.
+Coding standards (style, types, errors, logging, dependencies) are in
+[STANDARDS.md](STANDARDS.md).
 
 Component-specific setup and commands live with each component:
 [sdk/DEVELOPMENT.md](sdk/DEVELOPMENT.md), [platform/README.md](platform/README.md),
