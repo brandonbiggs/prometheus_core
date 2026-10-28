@@ -58,6 +58,7 @@ jobs:
           - platform/backend
           - platform/tests
           - platform/scripts
+          - platform/agents
           - agent-template
         include:
           # Not a uv project; linted with platform/tests' locked ruff
