@@ -229,7 +229,7 @@ def running_stack() -> bool:
     The compose services have fixed container names, so a second stack can't
     start next to it; the integration tests use the running one instead.
     """
-    return _docker_available() and _inspect_container("litellm-proxy", "{{.State.Status}}") == "running"
+    return _docker_available() and _inspect_container("backend", "{{.State.Status}}") == "running"
 
 
 @pytest.fixture(scope="session")
@@ -299,7 +299,6 @@ def docker_compose_up(project_root: Path, env_test_file: Path, test_ports: dict[
     if running_stack:
         env_vars = _parse_env_test_file(env_test_file)
         yield {
-            "litellm": int(env_vars.get("LITELLM_LOCAL_PORT", "9977")),
             "redis": int(env_vars.get("REDIS_LOCAL_PORT", "6379")),
             "client_agent": int(env_vars.get("CLIENT_AGENT_PORT", "8001")),
             "backend": int(env_vars.get("BACKEND_PORT", "8600")),

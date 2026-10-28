@@ -1011,7 +1011,7 @@ jobs:
       - name: Start
         # make up waits for every healthcheck, then runs make check: the
         # backend and frontend on their host ports, the frontend's /api proxy,
-        # and every agent registered with LiteLLM
+        # and every agent registered with the backend
         run: make up
       - name: Sync test environment
         working-directory: platform/tests
