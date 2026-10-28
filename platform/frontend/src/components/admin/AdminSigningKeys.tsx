@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Plus } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import type { SigningKey } from "@/lib/api/types";
+import { Button } from "@/components/ui/Button";
 import { StatusPill, type StatusPillTone } from "@/components/ui/StatusPill";
 
 /** An inactive key is waiting to be activated, so it warns; a retired key is done. */
@@ -104,10 +105,7 @@ export function AdminSigningKeys() {
             <code>/.well-known/jwks.json</code> instead of distributing a public key by hand.
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={handleGenerate} disabled={generating}>
-          <Plus size={15} />
-          {generating ? "Generating..." : "Generate key"}
-        </button>
+        <Button variant="primary" size="sm" icon={<Plus />} label={generating ? "Generating..." : "Generate key"} loading={generating} onClick={handleGenerate} />
       </div>
 
       {error && (
@@ -148,31 +146,12 @@ export function AdminSigningKeys() {
                       {key.retired_at ? new Date(key.retired_at).toLocaleString() : "—"}
                     </td>
                     <td className="flex gap-1 justify-end">
-                      <button
-                        className="btn btn-ghost btn-xs"
-                        onClick={() => handleCopy(key)}
-                        aria-label="Copy public key"
-                        title="Copy public key PEM"
-                      >
-                        {copiedId === key.id ? <Check size={14} /> : <Copy size={14} />}
-                      </button>
+                      <Button variant="ghost" size="xs" icon={copiedId === key.id ? <Check /> : <Copy />} ariaLabel="Copy public key" onClick={() => handleCopy(key)} />
                       {!key.is_active && !key.retired_at && (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          onClick={() => handleActivate(key)}
-                          disabled={busyId === key.id}
-                        >
-                          Activate
-                        </button>
+                        <Button variant="ghost" size="xs" label="Activate" disabled={busyId === key.id} onClick={() => handleActivate(key)} />
                       )}
                       {!key.retired_at && (
-                        <button
-                          className="btn btn-ghost btn-xs text-error"
-                          onClick={() => handleRetire(key)}
-                          disabled={busyId === key.id}
-                        >
-                          Retire
-                        </button>
+                        <Button variant="error" soft size="xs" label="Retire" disabled={busyId === key.id} onClick={() => handleRetire(key)} />
                       )}
                     </td>
                   </tr>

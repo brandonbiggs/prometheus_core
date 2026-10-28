@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, Shield, Trash2, User } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import type { AdminUser } from "@/lib/api/types";
+import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Tag } from "@/components/ui/Tag";
 
@@ -120,10 +121,7 @@ export function AdminUsers() {
     <div className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
       <div className="flex items-center justify-between">
         <h3>Users</h3>
-        <button className="btn btn-primary btn-sm" onClick={openCreate}>
-          <Plus size={15} />
-          New user
-        </button>
+        <Button variant="primary" size="sm" icon={<Plus />} label="New user" onClick={openCreate} />
       </div>
 
       {error && (
@@ -165,16 +163,8 @@ export function AdminUsers() {
                     {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : "never"}
                   </td>
                   <td className="flex gap-1 justify-end">
-                    <button className="btn btn-ghost btn-xs" onClick={() => openEdit(user)} aria-label="Edit user">
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-xs text-error"
-                      onClick={() => handleDelete(user)}
-                      aria-label="Delete user"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <Button variant="ghost" size="xs" icon={<Pencil />} ariaLabel="Edit user" onClick={() => openEdit(user)} />
+                    <Button variant="error" soft size="xs" icon={<Trash2 />} ariaLabel="Delete user" onClick={() => handleDelete(user)} />
                   </td>
                 </tr>
               ))}
@@ -237,11 +227,16 @@ export function AdminUsers() {
           </div>
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn btn-ghost btn-sm">Cancel</button>
+              <Button variant="ghost" size="sm" type="submit" label="Cancel" />
             </form>
-            <button className="btn btn-primary btn-sm" onClick={submitCreate} disabled={creating}>
-              {creating ? "Creating..." : "Create"}
-            </button>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              label={creating ? "Creating..." : "Create"}
+              loading={creating}
+              onClick={submitCreate}
+            />
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">
@@ -297,11 +292,16 @@ export function AdminUsers() {
           </div>
           <div className="modal-action">
             <form method="dialog">
-              <button className="btn btn-ghost btn-sm">Cancel</button>
+              <Button variant="ghost" size="sm" type="submit" label="Cancel" />
             </form>
-            <button className="btn btn-primary btn-sm" onClick={submitEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save"}
-            </button>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              label={saving ? "Saving..." : "Save"}
+              loading={saving}
+              onClick={submitEdit}
+            />
           </div>
         </div>
         <form method="dialog" className="modal-backdrop">
