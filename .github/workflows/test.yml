@@ -99,6 +99,39 @@ jobs:
       - name: Check
         run: python3 platform/scripts/add_markings.py --check
 
+  uv-lock:
+    # uv lock --check in every directory with a tracked uv.lock, so a
+    # pyproject.toml change can't land without re-locking. New uv projects are
+    # found by their uv.lock; npm ci covers the frontend's package-lock.json
+    name: "uv lock"
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.25"
+          python-version: "3.12"
+      - name: Check
+        # Checks every project before failing, so one run lists them all
+        run: |
+          mapfile -t locks < <(git ls-files -- 'uv.lock' '*/uv.lock')
+          [ "${#locks[@]}" -gt 0 ] || { echo "::error::No uv.lock files found"; exit 1; }
+          failed=0
+          for lock in "${locks[@]}"; do
+            dir="$(dirname "$lock")"
+            echo "::group::$dir"
+            if ! uv lock --check --directory "$dir"; then
+              echo "::error file=$lock::$lock is out of date with $dir/pyproject.toml. Run 'uv lock' in $dir and commit the result."
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$failed"
+
   hadolint-shellcheck:
     # hadolint on every Dockerfile and shellcheck on every shell script, found
     # by name or shebang. Config is in .hadolint.yaml

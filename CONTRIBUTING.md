@@ -123,6 +123,10 @@ A few rules apply repository-wide:
   the project's copyright marking. Run `git add` on new files first, then
   `python3 platform/scripts/add_markings.py` to add the marking wherever it's
   missing (`--check` only reports the files that lack it).
+- **Lockfiles.** After changing a `pyproject.toml`, run `uv lock` in its
+  directory and commit the updated `uv.lock`. CI runs `uv lock --check` in
+  every directory with a tracked `uv.lock`, so a new uv project is checked as
+  soon as its lockfile is committed.
 - **Coverage floors.** `sdk/` enforces a minimum coverage (`fail_under` in
   `pyproject.toml`). Add tests with your change, and don't lower the floor.
 - **No secrets.** CI scans every commit with gitleaks. Never commit `.env` files,
