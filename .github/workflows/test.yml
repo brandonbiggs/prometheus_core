@@ -132,6 +132,19 @@ jobs:
           done
           exit "$failed"
 
+  image-pins:
+    # Every Dockerfile FROM and compose image: is pinned by digest, so a tag
+    # can't silently move. Dependabot keeps the tag and digest current
+    name: "image pins"
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check
+        run: python3 platform/scripts/check_image_pins.py
+
   hadolint-shellcheck:
     # hadolint on every Dockerfile and shellcheck on every shell script, found
     # by name or shebang. Config is in .hadolint.yaml
