@@ -496,7 +496,7 @@ All containers share one bridge network, `prometheus_platform_agent-network`. Th
 | **litellm** | `litellm-proxy` | `ghcr.io/berriai/litellm:v1.92.0` | 9977 | Agent registry, A2A gateway, LLM proxy (`litellm_config.yaml`) |
 | **litellm-db** | `litellm-db` | `postgres:16-alpine` | — | LiteLLM state (agent registrations). **Wiped on every `make up`.** |
 | **admin-db** | `admin-db` | `postgres:16-alpine` | — | Users (bcrypt), OIDC providers, RS256 signing keys |
-| **redis** | `agent-valkey` | `valkey/valkey-bundle:9.1.0` | 6379 | Conversation state, browser sessions, SSE event bus, artifact catalog, task graph, caches |
+| **redis** | `agent-valkey` | `valkey/valkey-bundle:9.1.3` | 6379 | Conversation state, browser sessions, SSE event bus, artifact catalog, task graph, caches |
 | **agents/\*** | per agent | `agents/<name>/docker-compose.yml` | — (8008 artifact-debug) | Included automatically by `make generate` |
 
 {.tiny}

@@ -142,7 +142,7 @@ detached container with no output.
 ```
 NAME                  IMAGE                                     SERVICE               STATUS
 admin-db              postgres:16-alpine                        admin-db              Up (healthy)
-agent-valkey          valkey/valkey-bundle:9.1.0                 redis                 Up
+agent-valkey          valkey/valkey-bundle:9.1.3                 redis                 Up
 backend               prometheus_platform-backend                backend               Up (healthy)
 client-agent          prometheus_platform-client-agent           client-agent          Up (healthy)
 form-filler-agent     prometheus_platform-form-filler-agent      form-filler-agent     Up (healthy)
