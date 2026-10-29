@@ -40,3 +40,18 @@ updates:
       sdk:
         patterns: ["*"]
         update-types: [minor, patch]
+
+  # Actions are pinned by SHA with a version comment, and Dependabot updates
+  # both. The composite actions are listed so it reads their uses: too
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
