@@ -67,6 +67,24 @@ updates:
       actions:
         patterns: ["*"]
 
+  # The React frontend. Majors are ignored: they can change how the app builds
+  # or renders (Vite, React, the viewers' libraries), so they're upgraded by
+  # hand with a check of the app. Security updates still arrive for any version
+  - package-ecosystem: npm
+    directory: /platform/frontend
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
   # Base images pinned by tag and digest. The agent Dockerfiles build FROM the
   # prometheus_api base image through build args, which Dependabot can't
   # resolve; that hash is bumped by hand in platform/Makefile. Majors are
