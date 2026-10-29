@@ -60,7 +60,9 @@ jobs:
     name: "build ${{ matrix.platform }}"
     runs-on: ${{ matrix.runner }}
     strategy:
-      fail-fast: true
+      # A failed platform shouldn't cancel the other one, which still writes
+      # its build cache for the next run. The merge job needs both to run
+      fail-fast: false
       matrix:
         include:
           - platform: amd64
