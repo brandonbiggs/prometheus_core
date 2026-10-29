@@ -16,6 +16,7 @@ Synthesis Agent - Specialist for multi-result material analysis synthesis.
 Consumes outputs from data/radiation/corrosion/thermal specialists and produces
 a consolidated engineering summary for workflow final output.
 """
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path

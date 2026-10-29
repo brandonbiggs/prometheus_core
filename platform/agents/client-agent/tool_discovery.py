@@ -14,11 +14,13 @@
 Dynamic tool discovery from A2A registry.
 Creates callable tools by discovering agents and their skills from the registry.
 """
+
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import json
 import logging
 import os
+import socket as _socket
 import uuid
 from typing import Any, Dict, List, Literal, Optional
 
@@ -31,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 REGISTRY_URL = PrometheusAgent.registry_url()
 AGENT_SECRET = os.getenv("AGENT_SECRET", "")
-import socket as _socket
 
 _AGENT_PORT = (os.getenv("AGENT_PORT") or "8000").strip()
 SELF_AGENT_URL = (os.getenv("EXTERNAL_AGENT_URL") or f"http://{_socket.gethostname()}:{_AGENT_PORT}").rstrip("/")
@@ -117,13 +118,15 @@ async def discover_agents() -> List[Dict[str, Any]]:
     for entry in entries:
         card = entry.get("agent_card_params") or {}
         agent_name = entry.get("agent_name", "")
-        result.append({
-            "agent_id": agent_name,
-            "agent_name": agent_name,
-            "name": card.get("name", agent_name),
-            "url": card.get("url", ""),
-            "agent_card_params": card,
-        })
+        result.append(
+            {
+                "agent_id": agent_name,
+                "agent_name": agent_name,
+                "name": card.get("name", agent_name),
+                "url": card.get("url", ""),
+                "agent_card_params": card,
+            }
+        )
     return result
 
 
@@ -190,10 +193,7 @@ def create_input_schema_from_skill(skill: Dict) -> type[BaseModel]:
     # Generic fallback schema when a skill does not define inputSchema.
     # Allow extra kwargs so drop-in skills can still be called.
     class DefaultGenericInput(BaseModel):
-        conversation_id: Optional[str] = Field(
-            default=None,
-            description="Conversation ID for status tracking"
-        )
+        conversation_id: Optional[str] = Field(default=None, description="Conversation ID for status tracking")
         model_config = ConfigDict(extra="allow")
 
     # If no inputSchema provided, use default
@@ -264,7 +264,7 @@ def create_input_schema_from_skill(skill: Dict) -> type[BaseModel]:
     if "conversation_id" not in fields:
         fields["conversation_id"] = (
             Optional[str],
-            Field(default=None, description="Conversation ID for status tracking")
+            Field(default=None, description="Conversation ID for status tracking"),
         )
 
     # Create dynamic Pydantic model with populate_by_name for alias support
@@ -318,22 +318,16 @@ def _extract_status_payload(a2a_result: Dict[str, Any]) -> tuple[str, Dict[str, 
         raise A2AContractError("Malformed A2A v1 response: task.status.message must be an object")
     parts = status_message.get("parts")
     if not isinstance(parts, list) or len(parts) != 1:
-        raise A2AContractError(
-            "Malformed A2A v1 response: task.status.message.parts must contain one part"
-        )
+        raise A2AContractError("Malformed A2A v1 response: task.status.message.parts must contain one part")
     part = parts[0]
     if not isinstance(part, dict):
         raise A2AContractError("Malformed A2A v1 response: status part must be an object")
     unexpected = set(part) - {"text", "data", "metadata", "filename", "mediaType"}
     if unexpected:
-        raise A2AContractError(
-            f"Malformed A2A v1 response: unsupported status part fields {sorted(unexpected)}"
-        )
+        raise A2AContractError(f"Malformed A2A v1 response: unsupported status part fields {sorted(unexpected)}")
     content_fields = [field for field in ("text", "data") if field in part]
     if len(content_fields) != 1:
-        raise A2AContractError(
-            "Malformed A2A v1 response: status part must contain exactly one text or data field"
-        )
+        raise A2AContractError("Malformed A2A v1 response: status part must contain exactly one text or data field")
     content_field = content_fields[0]
     if content_field == "data":
         payload = part["data"]
@@ -346,31 +340,21 @@ def _extract_status_payload(a2a_result: Dict[str, Any]) -> tuple[str, Dict[str, 
     try:
         payload = json.loads(text_content)
     except json.JSONDecodeError as exc:
-        raise A2AContractError(
-            "Malformed A2A v1 response: final Part.text must contain a JSON object"
-        ) from exc
+        raise A2AContractError("Malformed A2A v1 response: final Part.text must contain a JSON object") from exc
     if not isinstance(payload, dict):
-        raise A2AContractError(
-            "Malformed A2A v1 response: final Part.text must contain a JSON object"
-        )
+        raise A2AContractError("Malformed A2A v1 response: final Part.text must contain a JSON object")
     return content_field, payload
 
 
 def _validate_input_required_payload(payload: Dict[str, Any]) -> None:
     if set(payload) != {"missing_inputs", "hint"}:
-        raise A2AContractError(
-            "Malformed A2A v1 INPUT_REQUIRED response: expected missing_inputs and hint"
-        )
+        raise A2AContractError("Malformed A2A v1 INPUT_REQUIRED response: expected missing_inputs and hint")
     hint = payload["hint"]
     if not isinstance(hint, str) or not hint.strip():
-        raise A2AContractError(
-            "Malformed A2A v1 INPUT_REQUIRED response: hint must be a non-empty string"
-        )
+        raise A2AContractError("Malformed A2A v1 INPUT_REQUIRED response: hint must be a non-empty string")
     missing_inputs = payload["missing_inputs"]
     if not isinstance(missing_inputs, list) or not missing_inputs:
-        raise A2AContractError(
-            "Malformed A2A v1 INPUT_REQUIRED response: missing_inputs must be a non-empty list"
-        )
+        raise A2AContractError("Malformed A2A v1 INPUT_REQUIRED response: missing_inputs must be a non-empty list")
     seen_names: set[str] = set()
     for index, item in enumerate(missing_inputs):
         if not isinstance(item, dict) or set(item) != _MISSING_INPUT_FIELDS:
@@ -386,19 +370,15 @@ def _validate_input_required_payload(payload: Dict[str, Any]) -> None:
                 )
         name = item["name"]
         if name in seen_names:
-            raise A2AContractError(
-                f"Malformed A2A v1 INPUT_REQUIRED response: duplicate field {name!r}"
-            )
+            raise A2AContractError(f"Malformed A2A v1 INPUT_REQUIRED response: duplicate field {name!r}")
         seen_names.add(name)
         if item["type"] not in _MISSING_INPUT_TYPES:
             raise A2AContractError(
-                "Malformed A2A v1 INPUT_REQUIRED response: "
-                f"missing_inputs[{index}].type is unsupported"
+                f"Malformed A2A v1 INPUT_REQUIRED response: missing_inputs[{index}].type is unsupported"
             )
         options = item["options"]
         if options is not None and (
-            not isinstance(options, list)
-            or not all(isinstance(option, str) for option in options)
+            not isinstance(options, list) or not all(isinstance(option, str) for option in options)
         ):
             raise A2AContractError(
                 "Malformed A2A v1 INPUT_REQUIRED response: "
@@ -407,8 +387,7 @@ def _validate_input_required_payload(payload: Dict[str, Any]) -> None:
         for field in ("resolvable_from_context", "required"):
             if not isinstance(item[field], bool):
                 raise A2AContractError(
-                    "Malformed A2A v1 INPUT_REQUIRED response: "
-                    f"missing_inputs[{index}].{field} must be boolean"
+                    f"Malformed A2A v1 INPUT_REQUIRED response: missing_inputs[{index}].{field} must be boolean"
                 )
 
 
@@ -465,6 +444,7 @@ async def call_a2a_agent(
             get_current_identity,
             USER_TOKEN_METADATA_KEY,
         )
+
         identity = get_current_identity()
         if identity and identity.raw_token:
             message_metadata[USER_TOKEN_METADATA_KEY] = identity.raw_token
@@ -485,7 +465,7 @@ async def call_a2a_agent(
             "configuration": {
                 "returnImmediately": False,
             },
-        }
+        },
     }
 
     request_params = {key: value for key, value in kwargs.items() if not key.startswith("_")}
@@ -545,9 +525,7 @@ async def call_a2a_agent(
 
                 # A2A v1 wraps a blocking response in SendMessageResponse.task.
                 result_payload = result.get("result", {})
-                if isinstance(result_payload, dict) and isinstance(
-                    result_payload.get("task"), dict
-                ):
+                if isinstance(result_payload, dict) and isinstance(result_payload.get("task"), dict):
                     a2a_result = result_payload["task"]
                 else:
                     a2a_result = result_payload
@@ -568,15 +546,12 @@ async def call_a2a_agent(
         state = status.get("state") if isinstance(status, dict) else None
         if state not in _A2A_V1_TASK_STATES:
             raise A2AContractError(
-                "Malformed A2A v1 response: task.status.state must be an exact "
-                "TASK_STATE_* ProtoJSON value"
+                "Malformed A2A v1 response: task.status.state must be an exact TASK_STATE_* ProtoJSON value"
             )
         content_field, parsed = _extract_status_payload(a2a_result)
         if state == "TASK_STATE_INPUT_REQUIRED":
             if content_field != "data":
-                raise A2AContractError(
-                    "Malformed A2A v1 INPUT_REQUIRED response: status message must use Part.data"
-                )
+                raise A2AContractError("Malformed A2A v1 INPUT_REQUIRED response: status message must use Part.data")
             _validate_input_required_payload(parsed)
             return {
                 "status": "input_required",
@@ -681,7 +656,7 @@ async def get_all_tools_dynamic() -> List[StructuredTool]:
     for agent in agents:
         try:
             agent_id = agent["agent_id"]
-            direct_url = agent["url"]   # downstream URL, used only for self-check
+            direct_url = agent["url"]  # downstream URL, used only for self-check
 
             # Never expose this orchestrator's own skills as dynamic tools.
             if is_self_agent(agent_id, direct_url):

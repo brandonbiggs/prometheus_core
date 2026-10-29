@@ -70,7 +70,11 @@ def test_identical_replies_of_two_turns_each_get_their_own_ids():
 
 def test_a_turn_without_a_reply_gets_no_stamp():
     # A follow-up question or a plan rejection: no content-bearing reply.
-    history = [_entry("user", "go", "T1", "t1"), _entry("assistant", "", "T1", "t2"), _entry("assistant", "hi", "T0", "t0")]
+    history = [
+        _entry("user", "go", "T1", "t1"),
+        _entry("assistant", "", "T1", "t2"),
+        _entry("assistant", "hi", "T0", "t0"),
+    ]
 
     assert stamp_turn_artifacts(history, "T1", ["a1"]) is False
     assert all("artifact_ids" not in e for e in history)
@@ -127,7 +131,13 @@ def test_a_late_background_store_keeps_the_newer_turns_entries():
 
 
 def test_the_newest_started_turn_owns_the_top_level_fields():
-    stored = {"conversation_history": [], "state_turn_id": "A", "state_turn_started_at": 100.0, "plan": "old", "title": "Kept"}
+    stored = {
+        "conversation_history": [],
+        "state_turn_id": "A",
+        "state_turn_started_at": 100.0,
+        "plan": "old",
+        "title": "Kept",
+    }
     local = {"conversation_history": [_entry("user", "hi", "B", "t1")], "plan": "new", "title": ""}
 
     merged = merge_conversation(stored, local, turn_id="B", started_at=200.0)
@@ -185,11 +195,19 @@ def test_llm_messages_keep_each_turns_block_ordered_by_turn_start():
         "conversation_history": [],
         "state_turn_id": "F",
         "state_turn_started_at": 200.0,
-        "llm_messages": [_msg("old", "legacy", 0.0), _msg("f question", "F", 200.0), _msg("f answer", "F", 200.0, "assistant")],
+        "llm_messages": [
+            _msg("old", "legacy", 0.0),
+            _msg("f question", "F", 200.0),
+            _msg("f answer", "F", 200.0, "assistant"),
+        ],
     }
     a_local = {
         "conversation_history": [],
-        "llm_messages": [_msg("old", "legacy", 0.0), _msg("a question", "A", 100.0), _msg("a answer", "A", 100.0, "assistant")],
+        "llm_messages": [
+            _msg("old", "legacy", 0.0),
+            _msg("a question", "A", 100.0),
+            _msg("a answer", "A", 100.0, "assistant"),
+        ],
     }
 
     merged = merge_conversation(stored, a_local, turn_id="A", started_at=100.0)
@@ -203,9 +221,7 @@ def test_merged_llm_messages_stay_bounded():
     from orchestrator.agent_loop import MAX_TRANSCRIPT_MESSAGES
 
     # Earlier turns' messages come back from storage on every merge.
-    earlier = [
-        _msg(f"{role} {i}", f"T{i}", float(i), role) for i in range(60) for role in ("user", "assistant")
-    ]
+    earlier = [_msg(f"{role} {i}", f"T{i}", float(i), role) for i in range(60) for role in ("user", "assistant")]
     stored = {"conversation_history": [], "llm_messages": earlier}
     local = {
         "conversation_history": [],
@@ -220,7 +236,12 @@ def test_merged_llm_messages_stay_bounded():
 
 
 def test_when_both_turns_leave_pending_input_the_newer_one_wins():
-    stored = {"conversation_history": [], "state_turn_id": "F", "state_turn_started_at": 200.0, "awaiting_approval": True}
+    stored = {
+        "conversation_history": [],
+        "state_turn_id": "F",
+        "state_turn_started_at": 200.0,
+        "awaiting_approval": True,
+    }
     b_local = {"conversation_history": [], "missing_info": ["width"]}
 
     merged = merge_conversation(stored, b_local, turn_id="B", started_at=100.0)

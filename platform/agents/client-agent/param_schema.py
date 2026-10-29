@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Canonical helpers for nested params and JSON-schema input metadata."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -64,12 +65,7 @@ def schema_input_source(prop: Dict[str, Any]) -> str:
     """Normalize schema-level input source annotations."""
     if not isinstance(prop, dict):
         return ""
-    raw = (
-        prop.get("x_input_source")
-        or prop.get("x-input-source")
-        or prop.get("input_source")
-        or ""
-    )
+    raw = prop.get("x_input_source") or prop.get("x-input-source") or prop.get("input_source") or ""
     return str(raw).strip().lower()
 
 

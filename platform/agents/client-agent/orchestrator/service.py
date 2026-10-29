@@ -55,10 +55,7 @@ class OrchestratorAgent(PrometheusAgent):
 
         if runtime.DISCOVERY_REFRESH_SECONDS > 0 and runtime._refresh_task is None:
             runtime._refresh_task = asyncio.create_task(runtime.discovery_refresh_loop())
-            print(
-                f"Background discovery refresh enabled "
-                f"({runtime.DISCOVERY_REFRESH_SECONDS}s interval)"
-            )
+            print(f"Background discovery refresh enabled ({runtime.DISCOVERY_REFRESH_SECONDS}s interval)")
 
         print("Client Agent ready!")
 
@@ -99,16 +96,10 @@ class OrchestratorAgent(PrometheusAgent):
 
         cleanup_stale_staged_uploads()
 
-        raw_name = (
-            request.query_params.get("name")
-            or request.headers.get("x-upload-name")
-            or "upload"
-        )
+        raw_name = request.query_params.get("name") or request.headers.get("x-upload-name") or "upload"
         name = Path(str(raw_name).replace("\\", "/")).name or "upload"
         mime_type = (
-            request.query_params.get("mime_type")
-            or request.headers.get("content-type")
-            or "application/octet-stream"
+            request.query_params.get("mime_type") or request.headers.get("content-type") or "application/octet-stream"
         ).split(";", 1)[0].strip().lower() or "application/octet-stream"
         conversation_id = request.query_params.get("conversation_id") or ""
         user_token = request.query_params.get("user_token") or ""
@@ -164,6 +155,7 @@ class OrchestratorAgent(PrometheusAgent):
         if user_token:
             try:
                 from prometheus_api.agent.identity import verify_user_token
+
                 staged_user_id = verify_user_token(user_token).user_id
             except Exception as exc:
                 print(f"[WARN] Could not verify user_token for staged upload: {exc}")
@@ -274,11 +266,7 @@ class OrchestratorAgent(PrometheusAgent):
 
         def walk(node: Any) -> None:
             if isinstance(node, dict):
-                if (
-                    isinstance(node.get("parts"), list)
-                    or node.get("uri")
-                    or node.get("json_body") is not None
-                ):
+                if isinstance(node.get("parts"), list) or node.get("uri") or node.get("json_body") is not None:
                     collected.append(node)
                 artifact_node = node.get("artifact")
                 if artifact_node is not None:
@@ -366,9 +354,7 @@ class OrchestratorAgent(PrometheusAgent):
                 if turn is not None:
                     # The finisher passes its turn explicitly, so record on it rather
                     # than on whatever turn the context holds.
-                    turn.produced_artifact_ids.extend(
-                        i for i in first_seen if i not in turn.produced_artifact_ids
-                    )
+                    turn.produced_artifact_ids.extend(i for i in first_seen if i not in turn.produced_artifact_ids)
         except Exception as exc:
             print(f"[WARN] Failed to ingest artifacts from response payload: {exc}")
         try:
@@ -467,6 +453,7 @@ class OrchestratorAgent(PrometheusAgent):
 
         try:
             from prometheus_api.storage_client.connection import ConnectionConfig
+
             storage_config = ConnectionConfig.from_env()
         except Exception as exc:
             print(f"[WARN] DeepLynx storage is unavailable; uploaded files will not be stored: {exc}")
@@ -480,22 +467,29 @@ class OrchestratorAgent(PrometheusAgent):
         try:
             async with runtime.create_llm() as llm:
                 descriptions = await infer_file_descriptions(
-                    request_payload.get("query") or "", uploaded_files, llm,
+                    request_payload.get("query") or "",
+                    uploaded_files,
+                    llm,
                 )
         except Exception as exc:
             print(f"[WARN] Failed to infer uploaded file descriptions; using fallbacks: {exc}")
             descriptions = {
-                f.name: f"User-uploaded {mime_type_label(f.mime_type, f.name)}: {f.name}"
-                for f in uploaded_files
+                f.name: f"User-uploaded {mime_type_label(f.mime_type, f.name)}: {f.name}" for f in uploaded_files
             }
 
         await emit_upload_status(f"Uploading {len(uploaded_files)} file(s) to DeepLynx.")
 
         try:
             from prometheus_api.agent.identity import current_user_id as _current_user_id
+
             _upload_user_id = _current_user_id() or None
             refs = await upload_files_to_deeplynx(
-                self, uploaded_files, descriptions, context, event_queue, storage_config,
+                self,
+                uploaded_files,
+                descriptions,
+                context,
+                event_queue,
+                storage_config,
                 user_id=_upload_user_id,
             )
         except Exception as exc:
@@ -536,9 +530,7 @@ class OrchestratorAgent(PrometheusAgent):
             request_payload["query"] = request_payload["message"]
         if "conversation_id" not in request_payload:
             request_payload["conversation_id"] = (
-                request_payload.get("context_id")
-                or context.context_id
-                or str(uuid.uuid4())
+                request_payload.get("context_id") or context.context_id or str(uuid.uuid4())
             )
         conversation_id = str(request_payload.get("conversation_id") or context.context_id or "")
         user_id: str = str(request_payload.get("user_id") or "")
@@ -553,6 +545,7 @@ class OrchestratorAgent(PrometheusAgent):
                     assert_conversation_owner,
                     record_conversation_owner,
                 )
+
                 assert_conversation_owner(conversation_id, user_id)
                 record_conversation_owner(conversation_id, user_id)
             except PermissionError as exc:
@@ -569,9 +562,7 @@ class OrchestratorAgent(PrometheusAgent):
 
         existing_artifacts = []
         try:
-            existing_artifacts = [
-                ref.to_dict() for ref in self.list_artifact_references(conversation_id, limit=50)
-            ]
+            existing_artifacts = [ref.to_dict() for ref in self.list_artifact_references(conversation_id, limit=50)]
         except Exception as exc:
             print(f"[WARN] Failed to list artifacts for {conversation_id}: {exc}")
         if existing_artifacts:
@@ -604,9 +595,7 @@ class OrchestratorAgent(PrometheusAgent):
             runtime.store_status_update(conversation_id, "Capability refresh complete. Continuing request.")
 
         # Infer descriptions and upload any files attached this turn before routing.
-        newly_uploaded_ids = await self._handle_uploaded_files(
-            request_payload, conversation_id, context, event_queue
-        )
+        newly_uploaded_ids = await self._handle_uploaded_files(request_payload, conversation_id, context, event_queue)
         if newly_uploaded_ids:
             request_payload["newly_uploaded_artifact_ids"] = newly_uploaded_ids
             task_tracking.record_produced_artifacts(newly_uploaded_ids)
@@ -659,9 +648,7 @@ class OrchestratorAgent(PrometheusAgent):
         # control and is notified on completion.
         root_id = task_tracking.ensure_background_root()
         self._spawn_background_finisher(chat_task, conversation_id, root_id, turn)
-        runtime.store_status_update(
-            conversation_id, "Task is now running in the background.", final=True
-        )
+        runtime.store_status_update(conversation_id, "Task is now running in the background.", final=True)
         backgrounded = ConversationResponse(
             conversation_id=conversation_id,
             status="backgrounded",

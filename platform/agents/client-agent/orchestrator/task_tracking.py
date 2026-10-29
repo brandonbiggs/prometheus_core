@@ -249,9 +249,7 @@ def ensure_background_root() -> Optional[str]:
         return None
     turn = _turn.get()
     try:
-        task_graph.update_own_state(
-            turn.conversation_id, root_id, own_state="working", is_background=True
-        )
+        task_graph.update_own_state(turn.conversation_id, root_id, own_state="working", is_background=True)
     except Exception as exc:
         logger.warning("[TASKTRACK] Failed to flag background root: %s", exc)
     return root_id
@@ -276,9 +274,7 @@ async def run_background_finish(
     except Exception as exc:
         if root_id:
             try:
-                task_graph.update_own_state(
-                    conversation_id, root_id, own_state="failed", error=str(exc)
-                )
+                task_graph.update_own_state(conversation_id, root_id, own_state="failed", error=str(exc))
             except Exception:
                 pass
         if on_status:
@@ -323,9 +319,7 @@ class SkillTracker:
         if not self._node_id:
             return
         try:
-            task_graph.update_own_state(
-                self._conversation_id, self._node_id, own_state="working", message=message
-            )
+            task_graph.update_own_state(self._conversation_id, self._node_id, own_state="working", message=message)
         except Exception as exc:
             logger.warning("[TASKTRACK] progress update failed: %s", exc)
 
@@ -383,14 +377,10 @@ async def track_skill(
             raise ValueError(f"Task Graph resume node '{resume_node_id}' does not exist")
         if node.skill != skill_id:
             raise ValueError(
-                f"Task Graph resume node '{resume_node_id}' belongs to skill "
-                f"'{node.skill}', not '{skill_id}'"
+                f"Task Graph resume node '{resume_node_id}' belongs to skill '{node.skill}', not '{skill_id}'"
             )
         if node.own_state != "input-required":
-            raise ValueError(
-                f"Task Graph resume node '{resume_node_id}' is '{node.own_state}', "
-                "not 'input-required'"
-            )
+            raise ValueError(f"Task Graph resume node '{resume_node_id}' is '{node.own_state}', not 'input-required'")
 
         actual_root_id = node.task_id
         seen: set[str] = set()
@@ -401,29 +391,21 @@ async def track_skill(
             parent = task_graph.get_node(conv, node.parent_task_id)
             if parent is None:
                 raise ValueError(
-                    f"Task Graph resume node '{resume_node_id}' has missing parent "
-                    f"'{node.parent_task_id}'"
+                    f"Task Graph resume node '{resume_node_id}' has missing parent '{node.parent_task_id}'"
                 )
             node = parent
             actual_root_id = node.task_id
         if actual_root_id != resume_root_id:
             raise ValueError(
-                f"Task Graph resume node '{resume_node_id}' belongs to root "
-                f"'{actual_root_id}', not '{resume_root_id}'"
+                f"Task Graph resume node '{resume_node_id}' belongs to root '{actual_root_id}', not '{resume_root_id}'"
             )
 
         turn = _turn.get()
         if turn is not None:
             if turn.conversation_id != conv:
-                raise ValueError(
-                    f"Task Graph turn belongs to conversation '{turn.conversation_id}', "
-                    f"not '{conv}'"
-                )
+                raise ValueError(f"Task Graph turn belongs to conversation '{turn.conversation_id}', not '{conv}'")
             if turn.created and turn.root_id != resume_root_id:
-                raise ValueError(
-                    f"Task Graph turn already uses root '{turn.root_id}', "
-                    f"not '{resume_root_id}'"
-                )
+                raise ValueError(f"Task Graph turn already uses root '{turn.root_id}', not '{resume_root_id}'")
             turn.root_id = resume_root_id
             turn.created = True
 

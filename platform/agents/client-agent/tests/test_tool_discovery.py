@@ -11,12 +11,12 @@
 # SPDX-License-Identifier: MIT
 
 """Tests for A2A response normalization in tool discovery."""
+
 from __future__ import annotations
 
 import asyncio
 import json
 import sys
-from pathlib import Path
 import types
 
 import pydantic
@@ -25,9 +25,7 @@ import pytest
 # sys.path setup (client-agent dir + prometheus_api contract) lives in conftest.py
 
 if "prometheus_api.agent" not in sys.modules:
-    prometheus_api_module = sys.modules.get(
-        "prometheus_api", types.ModuleType("prometheus_api")
-    )
+    prometheus_api_module = sys.modules.get("prometheus_api", types.ModuleType("prometheus_api"))
     agent_module = types.ModuleType("prometheus_api.agent")
 
     class _ArtifactReference:
@@ -265,7 +263,6 @@ def test_get_agent_card_prefers_raw_prometheus_endpoint(monkeypatch) -> None:
     assert result["skills"][0]["inputSchema"]["required"] == ["material_id", "context"]
 
 
-
 def test_discover_agents_sends_agent_secret_and_normalizes_entries(monkeypatch) -> None:
     captured: dict = {}
 
@@ -376,6 +373,7 @@ def test_capability_cache_refresh_routes_through_registry_gateway(monkeypatch) -
     assert capability is not None
     assert capability.agent_url == f"{capability_cache.REGISTRY_URL}/a2a/thermal-analysis-agent"
 
+
 def test_call_a2a_agent_enriches_response_with_native_artifacts(monkeypatch) -> None:
     a2a_payload = {
         "result": {
@@ -392,7 +390,7 @@ def test_call_a2a_agent_enriches_response_with_native_artifacts(monkeypatch) -> 
                             ),
                         }
                     ]
-                }
+                },
             },
             "artifacts": [
                 {
@@ -497,7 +495,7 @@ def test_call_a2a_agent_preserves_error_payload_from_final_status(monkeypatch) -
                             ),
                         }
                     ]
-                }
+                },
             }
         }
     }
@@ -666,11 +664,7 @@ def test_call_a2a_agent_propagates_conversation_id_as_context_id(monkeypatch) ->
         "result": {
             "status": {
                 "state": "TASK_STATE_COMPLETED",
-                "message": {
-                    "parts": [
-                        {"text": json.dumps({"status": "completed"})}
-                    ]
-                }
+                "message": {"parts": [{"text": json.dumps({"status": "completed"})}]},
             }
         }
     }
@@ -743,7 +737,7 @@ def test_get_all_tools_dynamic_fetches_full_agent_card(monkeypatch) -> None:
                         "required": ["material_id", "context"],
                     },
                 }
-            ]
+            ],
         }
 
     created = []
@@ -897,9 +891,7 @@ def test_call_a2a_agent_streaming_parses_final_status_and_artifacts(monkeypatch)
     assert request_capture["url"] == "http://example.test/a2a/osti-research-agent"
     assert request_capture["json"]["method"] == "SendStreamingMessage"
     assert request_capture["json"]["params"]["message"]["role"] == "ROLE_USER"
-    assert request_capture["json"]["params"]["configuration"] == {
-        "returnImmediately": False
-    }
+    assert request_capture["json"]["params"]["configuration"] == {"returnImmediately": False}
     assert request_capture["headers"]["A2A-Version"] == "1.0"
     assert "application/x-ndjson" in request_capture["headers"]["Accept"]
     assert result["status"] == "completed"
@@ -918,9 +910,7 @@ def test_call_a2a_agent_streaming_accepts_ndjson(monkeypatch) -> None:
                         "taskId": "task-2",
                         "status": {
                             "state": "TASK_STATE_WORKING",
-                            "message": {
-                                "parts": [{"text": "Rendering SVG..."}]
-                            },
+                            "message": {"parts": [{"text": "Rendering SVG..."}]},
                         },
                     }
                 }
@@ -1061,11 +1051,7 @@ def test_apply_stream_event_fires_background_callback_on_flag() -> None:
             }
         }
     }
-    asyncio.run(
-        a2a_stream.apply_stream_event(
-            {"kind": "task", "artifacts": []}, envelope, background_callback=bg
-        )
-    )
+    asyncio.run(a2a_stream.apply_stream_event({"kind": "task", "artifacts": []}, envelope, background_callback=bg))
     assert fired and fired[0]["background"] is True
     assert fired[0]["estimate_seconds"] == 30
 
@@ -1086,11 +1072,7 @@ def test_apply_stream_event_heartbeat_does_not_fire_background() -> None:
             }
         }
     }
-    asyncio.run(
-        a2a_stream.apply_stream_event(
-            {"kind": "task", "artifacts": []}, envelope, background_callback=bg
-        )
-    )
+    asyncio.run(a2a_stream.apply_stream_event({"kind": "task", "artifacts": []}, envelope, background_callback=bg))
     assert fired == []
 
 
@@ -1215,9 +1197,7 @@ def test_skill_tool_validates_input_and_forwards_original_keys(monkeypatch) -> N
             "required": ["steps"],
         },
     }
-    tool = asyncio.run(
-        tool_discovery.create_tool_from_skill("http://agent", skill, supports_streaming=True)
-    )
+    tool = asyncio.run(tool_discovery.create_tool_from_skill("http://agent", skill, supports_streaming=True))
 
     assert tool.name == "run_model"
     assert tool.description == "Run a model."
@@ -1227,9 +1207,7 @@ def test_skill_tool_validates_input_and_forwards_original_keys(monkeypatch) -> N
 
     assert json.loads(result) == {"ok": True}
     # Coerced to int, reserved name restored, unset optional fields not injected.
-    assert calls == [
-        ("http://agent", "run_model", True, {"steps": 3, "model_config": {"a": 1}})
-    ]
+    assert calls == [("http://agent", "run_model", True, {"steps": 3, "model_config": {"a": 1}})]
 
     with pytest.raises(pydantic.ValidationError):
         asyncio.run(tool.ainvoke({"steps": 1, "mode": "medium"}))

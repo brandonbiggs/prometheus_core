@@ -260,11 +260,9 @@ def stamp_turn_artifacts(
     if not ids or not turn_id:
         return False
     replies = [
-        e for e in history
-        if isinstance(e, dict)
-        and e.get("role") == "assistant"
-        and e.get("turn_id") == turn_id
-        and e.get("content")
+        e
+        for e in history
+        if isinstance(e, dict) and e.get("role") == "assistant" and e.get("turn_id") == turn_id and e.get("content")
     ]
     if not replies:
         return False

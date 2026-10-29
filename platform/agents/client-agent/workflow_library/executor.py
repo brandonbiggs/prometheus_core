@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Workflow executor with sequential/parallel/dag scheduling semantics."""
+
 from __future__ import annotations
 
 import asyncio
@@ -263,9 +264,7 @@ async def execute_workflow(
             item
             if not isinstance(item, BaseException)
             else StepRuntimeResult(step_id=step.id, status="failed", error=str(item))
-            for step, item in zip(
-                ready_steps, await asyncio.gather(*tasks, return_exceptions=True)
-            )
+            for step, item in zip(ready_steps, await asyncio.gather(*tasks, return_exceptions=True))
         ]
 
         for item in done:

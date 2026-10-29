@@ -36,10 +36,7 @@ from a2a.server.agent_execution.context import RequestContext
 from a2a.server.events import EventQueue
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -80,12 +77,7 @@ class FormFillerAgent(PrometheusAgent):
         key = f"form_filler:{conversation_id}"
         self.redis_client.set(key, json.dumps(state), ex=STATE_TTL_SECONDS)
 
-    def initialize_state(
-        self,
-        conversation_id: str,
-        context: str,
-        schema: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def initialize_state(self, conversation_id: str, context: str, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Initialize a new conversation state."""
         state = {
             "conversation_id": conversation_id,
@@ -102,7 +94,7 @@ class FormFillerAgent(PrometheusAgent):
     def extract_json_from_text(self, text: str) -> Optional[Dict]:
         """Extract JSON from text that may contain markdown code blocks."""
         # Try to find JSON in code blocks first
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', text, re.DOTALL)
+        json_match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(1))
@@ -110,7 +102,7 @@ class FormFillerAgent(PrometheusAgent):
                 pass
 
         # Try to find raw JSON object
-        json_match = re.search(r'\{.*\}', text, re.DOTALL)
+        json_match = re.search(r"\{.*\}", text, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(0))
@@ -207,11 +199,7 @@ For enum fields, use the exact allowed value if mentioned.
         state["updated_at"] = datetime.now(timezone.utc).isoformat()
         return state
 
-    def process_form_input(
-        self,
-        state: Dict[str, Any],
-        followup_answers: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def process_form_input(self, state: Dict[str, Any], followup_answers: Dict[str, Any]) -> Dict[str, Any]:
         """Process structured form input answers."""
         schema = state["schema"]
         properties = schema.get("properties", {})
@@ -343,11 +331,7 @@ Only include fields where you found a clear value. Use null for fields where no 
 
         return [f for f in required if f not in current_values]
 
-    def generate_followup_questions(
-        self,
-        state: Dict[str, Any],
-        missing_fields: List[str]
-    ) -> List[Dict[str, Any]]:
+    def generate_followup_questions(self, state: Dict[str, Any], missing_fields: List[str]) -> List[Dict[str, Any]]:
         """Generate followup questions for missing fields."""
         schema = state["schema"]
         properties = schema.get("properties", {})
@@ -404,9 +388,9 @@ Only include fields where you found a clear value. Use null for fields where no 
             # Extract unit from description if present (e.g., "Temperature in °C")
             if description:
                 unit_patterns = [
-                    r'\(([^)]+)\)$',  # (°C)
-                    r'in\s+(\S+)$',    # in °C
-                    r'\[([^\]]+)\]$',  # [MPa]
+                    r"\(([^)]+)\)$",  # (°C)
+                    r"in\s+(\S+)$",  # in °C
+                    r"\[([^\]]+)\]$",  # [MPa]
                 ]
                 for pattern in unit_patterns:
                     match = re.search(pattern, description)

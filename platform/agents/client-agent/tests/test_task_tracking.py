@@ -51,9 +51,7 @@ def fake_redis(monkeypatch) -> _FakeRedis:
     return fake
 
 
-async def _run_skill(
-    conversation_id: str, skill_id: str, result: Dict[str, Any]
-) -> None:
+async def _run_skill(conversation_id: str, skill_id: str, result: Dict[str, Any]) -> None:
     async with task_tracking.track_skill(conversation_id, skill_id) as tracker:
         task_tracking.apply_result_outcome(tracker, result)
 
@@ -123,9 +121,7 @@ def test_input_required_marks_child(fake_redis: _FakeRedis) -> None:
 def test_input_required_resume_reuses_root_and_child(fake_redis: _FakeRedis) -> None:
     async def scenario() -> tuple[str, str]:
         task_tracking.begin_turn(CONV, "create a valve")
-        async with task_tracking.track_skill(
-            CONV, "author_equipment_geometry"
-        ) as tracker:
+        async with task_tracking.track_skill(CONV, "author_equipment_geometry") as tracker:
             root_id = task_tracking.current_root_id()
             node_id = tracker.node_id
             tracker.input_required()
@@ -160,9 +156,7 @@ def test_repeated_input_required_resume_reuses_same_nodes(
 ) -> None:
     async def scenario() -> tuple[str, str]:
         task_tracking.begin_turn(CONV, "create a valve")
-        async with task_tracking.track_skill(
-            CONV, "author_equipment_geometry"
-        ) as tracker:
+        async with task_tracking.track_skill(CONV, "author_equipment_geometry") as tracker:
             root_id = task_tracking.current_root_id()
             node_id = tracker.node_id
             tracker.input_required()
@@ -235,9 +229,7 @@ def test_input_required_resume_failure_fails_original_tree(
 ) -> None:
     async def scenario() -> tuple[str, str]:
         task_tracking.begin_turn(CONV, "create a valve")
-        async with task_tracking.track_skill(
-            CONV, "author_equipment_geometry"
-        ) as tracker:
+        async with task_tracking.track_skill(CONV, "author_equipment_geometry") as tracker:
             root_id = task_tracking.current_root_id()
             node_id = tracker.node_id
             tracker.input_required()
@@ -280,9 +272,7 @@ def test_result_ref_extracted_from_artifacts(fake_redis: _FakeRedis) -> None:
     assert _by_skill(CONV)["synthesis"].result_ref == "art-123"
 
 
-def test_streaming_skill_status_updates_tracked_node(
-    fake_redis: _FakeRedis, monkeypatch
-) -> None:
+def test_streaming_skill_status_updates_tracked_node(fake_redis: _FakeRedis, monkeypatch) -> None:
     status_history = []
 
     class _StreamingTool:
@@ -300,9 +290,7 @@ def test_streaming_skill_status_updates_tracked_node(
     monkeypatch.setattr(
         skills,
         "get_capability_cache",
-        lambda: SimpleNamespace(
-            get_capability_by_skill_id=fake_get_capability_by_skill_id
-        ),
+        lambda: SimpleNamespace(get_capability_by_skill_id=fake_get_capability_by_skill_id),
     )
     monkeypatch.setattr(
         skills.runtime,
@@ -322,9 +310,7 @@ def test_streaming_skill_status_updates_tracked_node(
     assert "[mesh_geometry] Running execute_code… mesh iteration 2" in status_history
 
 
-def test_invoke_skill_returns_and_consumes_task_graph_resume_ids(
-    fake_redis: _FakeRedis, monkeypatch
-) -> None:
+def test_invoke_skill_returns_and_consumes_task_graph_resume_ids(fake_redis: _FakeRedis, monkeypatch) -> None:
     invoked_params: list[Dict[str, Any]] = []
 
     class _InputRequiredThenCompleteTool:
@@ -333,9 +319,7 @@ def test_invoke_skill_returns_and_consumes_task_graph_resume_ids(
             if len(invoked_params) == 1:
                 return {
                     "status": "input_required",
-                    "input_required": {
-                        "missing_inputs": [{"name": "rod_diameter", "type": "number"}]
-                    },
+                    "input_required": {"missing_inputs": [{"name": "rod_diameter", "type": "number"}]},
                     "_a2a_context_id": "a2a-context-1",
                     "_a2a_task_id": "a2a-task-1",
                 }
@@ -353,9 +337,7 @@ def test_invoke_skill_returns_and_consumes_task_graph_resume_ids(
     monkeypatch.setattr(
         skills,
         "get_capability_cache",
-        lambda: SimpleNamespace(
-            get_capability_by_skill_id=fake_get_capability_by_skill_id
-        ),
+        lambda: SimpleNamespace(get_capability_by_skill_id=fake_get_capability_by_skill_id),
     )
     monkeypatch.setattr(skills.runtime, "store_status_update", lambda *_args, **_kwargs: None)
 

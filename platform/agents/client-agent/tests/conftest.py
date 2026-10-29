@@ -25,6 +25,7 @@ CLIENT_AGENT_DIR = Path(__file__).resolve().parents[1]
 if str(CLIENT_AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(CLIENT_AGENT_DIR))
 
+
 def _import_light_modules() -> None:
     # The dependency-light prometheus_api modules the client-agent imports at
     # module level (the heavy agent runtime is stubbed by individual tests).

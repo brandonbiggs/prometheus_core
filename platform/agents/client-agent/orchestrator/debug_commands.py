@@ -311,10 +311,7 @@ def _format_workflows_response(catalog: List[Dict[str, Any]]) -> str:
 def _format_help_response(workflow_commands: List[Dict[str, str]]) -> str:
     total = len(SUPPORTED_SLASH_COMMANDS) + len(workflow_commands)
     lines = [f"Available commands ({total})", "", f"Built-in commands ({len(SUPPORTED_SLASH_COMMANDS)})"]
-    lines.extend(
-        f"- `/{command}` — {SLASH_COMMAND_DESCRIPTIONS[command]}"
-        for command in SUPPORTED_SLASH_COMMANDS
-    )
+    lines.extend(f"- `/{command}` — {SLASH_COMMAND_DESCRIPTIONS[command]}" for command in SUPPORTED_SLASH_COMMANDS)
     lines.extend(["", f"Workflow commands ({len(workflow_commands)})"])
     if not workflow_commands:
         lines.append("- None currently registered")
@@ -323,9 +320,7 @@ def _format_help_response(workflow_commands: List[Dict[str, str]]) -> str:
             workflow_ref = entry["workflow_id"]
             if entry["workflow_version"]:
                 workflow_ref += f"@{entry['workflow_version']}"
-            lines.append(
-                f"- `/{entry['command']}` — {entry['display_name']} ({workflow_ref})"
-            )
+            lines.append(f"- `/{entry['command']}` — {entry['display_name']} ({workflow_ref})")
     return "\n".join(lines)
 
 
@@ -380,11 +375,7 @@ def _render_tree_lines(node: Dict[str, Any], depth: int = 0) -> List[str]:
 
 
 def _format_tasks_list(trees: List[Dict[str, Any]]) -> str:
-    active = sum(
-        1
-        for tree in trees
-        if str(tree.get("state")) not in task_graph.TERMINAL_STATES
-    )
+    active = sum(1 for tree in trees if str(tree.get("state")) not in task_graph.TERMINAL_STATES)
     header = f"Tasks ({len(trees)} total, {active} active)"
     if not trees:
         return header + "\n\nNo tasks have run in this conversation yet."

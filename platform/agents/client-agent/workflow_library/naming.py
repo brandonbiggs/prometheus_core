@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Workflow names used for LLM tools and slash-command aliases."""
+
 from __future__ import annotations
 
 import hashlib
@@ -83,9 +84,5 @@ def find_workflow_by_command(command: str, workflows: Iterable[Any]) -> Optional
         if normalized == workflow_slug(str(getattr(definition, "id", "") or "")):
             return workflow
 
-    matches = [
-        workflow
-        for workflow in candidates
-        if normalized in workflow_command_aliases(workflow)
-    ]
+    matches = [workflow for workflow in candidates if normalized in workflow_command_aliases(workflow)]
     return matches[0] if len(matches) == 1 else None

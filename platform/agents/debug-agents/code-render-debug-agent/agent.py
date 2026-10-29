@@ -149,9 +149,7 @@ def _csv_body(sample: str, lines: int) -> str:
     wanted = lines - 1
     rows = data[:wanted]
     for n in range(len(data) + 1, wanted + 1):
-        rows.append(
-            f"2026-10-07T00:00:00Z,{n},{300 + n * 0.5:.1f},{1.0 / n:.3e},padding row {n:05d},pad"
-        )
+        rows.append(f"2026-10-07T00:00:00Z,{n},{300 + n * 0.5:.1f},{1.0 / n:.3e},padding row {n:05d},pad")
     return "\n".join([header, *rows]) + "\n"
 
 
@@ -210,8 +208,7 @@ class CodeRenderDebugAgent(PrometheusAgent):
         resolved = resolve_routing(spec, routing)
         if resolved is None:
             return self._error(
-                f"No MIME type routes {spec.language} to the code viewer; "
-                "use routing 'both' or 'extension'."
+                f"No MIME type routes {spec.language} to the code viewer; use routing 'both' or 'extension'."
             )
         name, mime_type = resolved
 

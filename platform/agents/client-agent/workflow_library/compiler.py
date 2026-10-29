@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Workflow compiler and validator."""
+
 from __future__ import annotations
 
 import re
@@ -146,9 +147,7 @@ def _resolve_required_binding_source(params: Dict[str, Any], required_path: str)
 
 def _build_ancestor_map(steps: List[Dict[str, Any]]) -> Dict[str, Set[str]]:
     deps_by_step: Dict[str, List[str]] = {
-        str(step.get("id")): list(step.get("depends_on", []) or [])
-        for step in steps
-        if step.get("id")
+        str(step.get("id")): list(step.get("depends_on", []) or []) for step in steps if step.get("id")
     }
     memo: Dict[str, Set[str]] = {}
 
@@ -321,10 +320,7 @@ def compile_workflow(
 
         for step in definition.steps:
             if step.skill_id not in capabilities_by_skill:
-                message = (
-                    f"Workflow '{definition.id}' step '{step.id}' references unknown skill "
-                    f"'{step.skill_id}'"
-                )
+                message = f"Workflow '{definition.id}' step '{step.id}' references unknown skill '{step.skill_id}'"
                 if strict:
                     raise WorkflowCompileError(message)
                 warnings.append(message)

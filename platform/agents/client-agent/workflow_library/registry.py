@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 
 """Workflow registry with compile-time validation and atomic refresh."""
+
 from __future__ import annotations
 
 import hashlib
@@ -206,9 +207,7 @@ class WorkflowRegistry:
                 or path.split(".")[-1].replace("_", " ").title()
             )
             description = (
-                (override.description if override else None)
-                or prop.get("description")
-                or f"Provide value for {path}"
+                (override.description if override else None) or prop.get("description") or f"Provide value for {path}"
             )
             unit = (
                 (override.unit if override and override.unit else None)
@@ -217,11 +216,7 @@ class WorkflowRegistry:
                 or prop.get("x-unit")
             )
             description = _append_unit_to_description(description, unit)
-            field_type = (
-                (override.type if override else None)
-                or prop.get("type")
-                or "text"
-            )
+            field_type = (override.type if override else None) or prop.get("type") or "text"
             enum = prop.get("enum") if isinstance(prop, dict) else None
             source = (
                 "workflow_override"
@@ -273,9 +268,7 @@ class WorkflowRegistry:
         for path in files:
             raw_text = path.read_text(encoding="utf-8")
             stat = path.stat()
-            checksum_parts.append(
-                f"{path}:{stat.st_mtime_ns}:{hashlib.sha256(raw_text.encode('utf-8')).hexdigest()}"
-            )
+            checksum_parts.append(f"{path}:{stat.st_mtime_ns}:{hashlib.sha256(raw_text.encode('utf-8')).hexdigest()}")
             try:
                 data = yaml.safe_load(raw_text) or {}
                 compiled = compile_workflow(
@@ -325,17 +318,13 @@ class WorkflowRegistry:
                         metadata.setdefault("source_agent_url", source_agent_url)
 
                 serialized = json.dumps(data, sort_keys=True, default=str)
-                checksum_parts.append(
-                    f"{source_label}:{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}"
-                )
+                checksum_parts.append(f"{source_label}:{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}")
 
                 try:
                     compiled = compile_workflow(
                         raw=data,
                         source_path=(
-                            Path("agent_cards")
-                            / _safe_source_segment(source_agent)
-                            / f"workflow-{index}.json"
+                            Path("agent_cards") / _safe_source_segment(source_agent) / f"workflow-{index}.json"
                         ),
                         capabilities_by_skill=capabilities_by_skill,
                         strict=self.strict,

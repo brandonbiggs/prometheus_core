@@ -46,6 +46,7 @@ Skills
   turn (the user regains control immediately and is notified out-of-band on
   completion). The reference exercise for the agent-driven background-task path.
 """
+
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -90,9 +91,7 @@ class BlockingDemoWorker(PrometheusWorker):
                 }
             time.sleep(1)  # the blocking wait that never yields to the event loop
             elapsed = int(time.monotonic() - start)
-            self.emit_status_update(
-                f"Blocking compute in progress… {elapsed}/{self.duration_seconds}s elapsed."
-            )
+            self.emit_status_update(f"Blocking compute in progress… {elapsed}/{self.duration_seconds}s elapsed.")
 
         # A JSON artifact is handy for verbose, structured progress output —
         # e.g. intermediate results streamed from a long numerical simulation.
@@ -163,9 +162,7 @@ class ThreadPatternAgent(PrometheusAgent):
         # run_worker runs worker.run() off-loop, forwards its emitted events from
         # the loop, flushes on completion, re-raises worker errors, and on caller
         # cancellation signals the worker to stop cooperatively.
-        result = await self.run_worker(
-            worker, context, event_queue, poll_interval=POLL_INTERVAL_SECONDS
-        )
+        result = await self.run_worker(worker, context, event_queue, poll_interval=POLL_INTERVAL_SECONDS)
         result.setdefault("message", f"Blocking task finished after {result.get('elapsed_seconds')}s.")
         return result
 
@@ -201,15 +198,12 @@ class ThreadPatternAgent(PrometheusAgent):
             event_queue=event_queue,
             estimate_seconds=duration_seconds,
             message=(
-                f"Accepted; this will take ~{duration_seconds}s and will run in "
-                "the background while you keep working."
+                f"Accepted; this will take ~{duration_seconds}s and will run in the background while you keep working."
             ),
         )
 
         worker = BlockingDemoWorker(duration_seconds)
-        result = await self.run_worker(
-            worker, context, event_queue, poll_interval=POLL_INTERVAL_SECONDS
-        )
+        result = await self.run_worker(worker, context, event_queue, poll_interval=POLL_INTERVAL_SECONDS)
         result["background"] = True
         result.setdefault(
             "message",

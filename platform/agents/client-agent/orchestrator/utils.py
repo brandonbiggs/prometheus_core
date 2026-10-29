@@ -28,6 +28,7 @@ def extract_result_text(result_data: Any) -> str:
         return json.dumps(result_data, indent=2)
     return str(result_data)
 
+
 def normalize_suggested_queries(raw: Any, limit: int = 3) -> List[Dict[str, str]]:
     """Normalize suggested query payloads into UI-friendly metadata entries."""
     if not isinstance(raw, list):
@@ -50,6 +51,7 @@ def normalize_suggested_queries(raw: Any, limit: int = 3) -> List[Dict[str, str]
         if len(results) >= limit:
             break
     return results
+
 
 def collect_suggested_queries(tool_results: Dict[str, Any], limit: int = 3) -> List[Dict[str, str]]:
     """Collect deduplicated suggested queries from skill result payloads."""

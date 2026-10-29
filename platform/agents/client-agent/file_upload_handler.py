@@ -22,6 +22,7 @@ artifact references.
 
 See docs/dev-docs/file-uploads.md for the full workflow description.
 """
+
 from __future__ import annotations
 
 import json
@@ -150,9 +151,7 @@ def resolve_staged_upload(uploaded_file: UploadedFile, user_id: Optional[str] = 
     # (dev mode or legacy uploads without a stamped owner).
     staged_user_id = metadata.get("user_id") or ""
     if user_id and staged_user_id and staged_user_id != user_id:
-        raise PermissionError(
-            f"Staged upload {uploaded_file.upload_id} was created by a different user"
-        )
+        raise PermissionError(f"Staged upload {uploaded_file.upload_id} was created by a different user")
 
     actual_size = source_path.stat().st_size
     if actual_size > MAX_UPLOAD_BYTES:
@@ -261,6 +260,7 @@ def mime_type_label(mime_type: str, filename: str = "") -> str:
 # Description inference
 # ---------------------------------------------------------------------------
 
+
 async def infer_file_descriptions(
     query: str,
     files: List[UploadedFile],
@@ -272,10 +272,7 @@ async def infer_file_descriptions(
     the query provides rich context it is used; otherwise the description is
     synthesised from the filename and MIME type alone.
     """
-    file_list = "\n".join(
-        f"- {f.name} ({mime_type_label(f.mime_type, f.name)}, {f.size_bytes:,} bytes)"
-        for f in files
-    )
+    file_list = "\n".join(f"- {f.name} ({mime_type_label(f.mime_type, f.name)}, {f.size_bytes:,} bytes)" for f in files)
     prompt = (
         "The user uploaded the following file(s) together with a query.\n\n"
         f"Files:\n{file_list}\n\n"
@@ -283,7 +280,7 @@ async def infer_file_descriptions(
         "For each file, write one concise sentence describing what it likely contains "
         "and why it was uploaded.  Use the query for context when it is informative; "
         "otherwise synthesise a description from the filename and file type alone "
-        "(e.g. \"MOOSE Exodus mesh file for reactor core geometry.\").\n"
+        '(e.g. "MOOSE Exodus mesh file for reactor core geometry.").\n'
         "Always produce a non-empty string — never output null.\n\n"
         "Respond ONLY with a JSON object mapping each exact filename to its description:\n"
         '{"filename1": "description", "filename2": "description", ...}'
@@ -314,6 +311,7 @@ def _fallback_description(f: UploadedFile) -> str:
 # ---------------------------------------------------------------------------
 # DeepLynx upload
 # ---------------------------------------------------------------------------
+
 
 async def upload_files_to_deeplynx(
     agent: Any,

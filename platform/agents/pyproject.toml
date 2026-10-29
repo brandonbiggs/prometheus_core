@@ -1,0 +1,22 @@
+[project]
+# Not a package: holds the shared lint config and locked ruff version for every
+# agent under platform/agents/. Each agent keeps its own pyproject.toml for its
+# runtime dependencies; ruff skips a pyproject.toml without a [tool.ruff]
+# section, so every agent resolves to this one. Don't add [tool.ruff] to an
+# agent's pyproject.toml unless it extends this file.
+name = "prometheus-platform-agents"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+# Shared platform settings
+extend = "../ruff.toml"
