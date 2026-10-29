@@ -7,6 +7,45 @@ minimal code example.
 
 ## 0.15.0
 
+### Register with the Platform Backend; the Platform No Longer Runs LiteLLM
+
+The platform's `litellm` and `litellm-db` containers were removed. The backend now hosts the
+agent registry and A2A gateway on the same paths LiteLLM served (`/v1/agents` and
+`/a2a/{agent_name}`), so the SDK's registry client is unchanged. Only agent deployment
+configuration has to move. Registrations are stored in Valkey under `prometheus:agent-registry`
+rather than in `litellm-db`. This applies to agents deployed on the Prometheus platform; agents
+registering with their own LiteLLM proxy are unaffected.
+
+Migration steps:
+
+1. Set `REGISTRY_URL=http://backend:8000`. The SDK default is still `http://litellm:4000`, so
+   leaving it unset now fails registration.
+2. Set `LITELLM_MASTER_KEY` to the value of `AGENT_SECRET`. The SDK still sends that variable
+   as its registry bearer token, and the backend checks it against `AGENT_SECRET`. The separate
+   LiteLLM master key is gone.
+3. Set `LLM_CONFIG_PROFILE` explicitly to a profile that calls a provider directly, such as
+   `openai`, `anthropic`, or `inl_hpc`. The `registry` profile does not work on the platform:
+   it sends LLM calls to `REGISTRY_URL`, which now points at the agent registry rather than an
+   LLM proxy. Platform compose files refuse to start when `LLM_CONFIG_PROFILE` is unset.
+4. In `depends_on`, wait for `backend` instead of `litellm`.
+5. Use `make clear-agent-registry` instead of `make clear-litellm-db`. Every platform launch
+   target still clears the registry first.
+6. Delete the leftover `<project>_litellm-db-data` Docker volume from existing deployments.
+
+```yaml
+services:
+  my-agent:
+    environment:
+      AGENT_SECRET: ${AGENT_SECRET}
+      REGISTRY_URL: ${REGISTRY_URL:-http://backend:8000}
+      LLM_CONFIG_PROFILE: ${LLM_CONFIG_PROFILE:?set LLM_CONFIG_PROFILE in .env}
+      # The SDK sends this as its registry token; the backend registry checks AGENT_SECRET.
+      LITELLM_MASTER_KEY: ${AGENT_SECRET}
+    depends_on:
+      backend:
+        condition: service_healthy
+```
+
 ### Configure DeepLynx for Automatic Execution Records
 
 Before `_execute(...)`, the standard `PrometheusAgent` executor now creates a mandatory
