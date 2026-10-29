@@ -207,7 +207,7 @@ jobs:
     name: "k3d: cluster targets"
     needs: gitleaks
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: platform
