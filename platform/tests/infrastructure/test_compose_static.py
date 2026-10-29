@@ -65,7 +65,7 @@ def test_postgres_image_version(compose_data):
 
 def test_redis_service_uses_valkey_bundle(compose_data):
     svc = compose_data["services"]["redis"]
-    assert _image_tag(svc) == "valkey/valkey-bundle:9.1.0"
+    assert _image_tag(svc) == "valkey/valkey-bundle:9.1.3"
     assert svc["command"][:1] == ["valkey-server"]
 
 
