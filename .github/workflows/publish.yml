@@ -70,9 +70,9 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-image.yml
     with:
+      prefix: ${{ needs.meta.outputs.prefix }}
       name: sdk
-      image: ${{ needs.meta.outputs.prefix }}/prometheus_sdk-devel
-      cache-image: ${{ needs.meta.outputs.prefix }}/buildcache-prometheus_sdk-devel
+      suffix: -devel
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       context: sdk
@@ -87,9 +87,9 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-image.yml
     with:
+      prefix: ${{ needs.meta.outputs.prefix }}
       name: backend
-      image: ${{ needs.meta.outputs.prefix }}/prometheus_backend-devel
-      cache-image: ${{ needs.meta.outputs.prefix }}/buildcache-prometheus_backend-devel
+      suffix: -devel
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       # Same context and sdk/certs contexts as docker-compose.yml
@@ -107,9 +107,9 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-image.yml
     with:
+      prefix: ${{ needs.meta.outputs.prefix }}
       name: frontend
-      image: ${{ needs.meta.outputs.prefix }}/prometheus_frontend-devel
-      cache-image: ${{ needs.meta.outputs.prefix }}/buildcache-prometheus_frontend-devel
+      suffix: -devel
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       # Same context, target, and certs context as docker-compose.yml

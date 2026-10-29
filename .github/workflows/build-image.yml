@@ -6,19 +6,20 @@ name: build-image
 on:
   workflow_call:
     inputs:
+      prefix:
+        description: Registry path the packages go under, e.g. ghcr.io/owner/repo
+        required: true
+        type: string
       name:
-        description: Short name, unique within the run (keys the digest artifacts)
+        description: Short name, unique within the run (keys the digest artifacts). The image is prometheus_<name><suffix>
         required: true
         type: string
-      image:
-        description: Full image name, without the tag
-        required: true
+      suffix:
+        description: Appended to the image name, e.g. -devel
+        required: false
         type: string
+        default: ""
       tag:
-        required: true
-        type: string
-      cache-image:
-        description: Registry package for the build cache, without the tag. One tag per platform
         required: true
         type: string
       sha:
@@ -47,6 +48,12 @@ on:
 permissions:
   contents: read
   packages: write
+
+env:
+  IMAGE: ${{ inputs.prefix }}/prometheus_${{ inputs.name }}${{ inputs.suffix }}
+  # Build cache for the PR builds in test.yml, which only read it. One tag per
+  # platform. Only this workflow, never PR code, writes it
+  CACHE: ${{ inputs.prefix }}/buildcache-prometheus_${{ inputs.name }}${{ inputs.suffix }}
 
 jobs:
   build:
@@ -89,15 +96,13 @@ jobs:
             org.opencontainers.image.revision=${{ inputs.sha }}
             org.opencontainers.image.version=${{ inputs.tag }}
           # The tag is applied in the merge job, once both platforms exist
-          outputs: type=image,name=${{ inputs.image }},push-by-digest=true,name-canonical=true,push=true
-          # The registry cache is read by the PR builds in test.yml, which is
-          # why only this workflow (never PR code) gets to write it. The gha
-          # cache is the fallback if the registry one is missing
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          # The gha cache is the fallback if the registry one is missing
           cache-from: |
-            type=registry,ref=${{ inputs.cache-image }}:${{ matrix.platform }}
+            type=registry,ref=${{ env.CACHE }}:${{ matrix.platform }}
             type=gha,scope=${{ inputs.name }}-${{ matrix.platform }}
           cache-to: |
-            type=registry,ref=${{ inputs.cache-image }}:${{ matrix.platform }},mode=max,image-manifest=true,oci-mediatypes=true
+            type=registry,ref=${{ env.CACHE }}:${{ matrix.platform }},mode=max,image-manifest=true,oci-mediatypes=true
             type=gha,mode=max,scope=${{ inputs.name }}-${{ matrix.platform }}
       - name: Export digest
         env:
@@ -135,7 +140,6 @@ jobs:
       - name: Create multi-arch tag
         working-directory: ${{ runner.temp }}/digests
         env:
-          IMAGE: ${{ inputs.image }}
           TAG: ${{ inputs.tag }}
           SOURCE: ${{ github.server_url }}/${{ github.repository }}
           SHA: ${{ inputs.sha }}
@@ -154,5 +158,5 @@ jobs:
             "${digests[@]/#/$IMAGE@sha256:}"
       - name: Inspect
         env:
-          REF: ${{ inputs.image }}:${{ inputs.tag }}
-        run: docker buildx imagetools inspect "$REF"
+          TAG: ${{ inputs.tag }}
+        run: docker buildx imagetools inspect "$IMAGE:$TAG"
