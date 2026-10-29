@@ -76,10 +76,10 @@ Note: Fill in judge names. Weights can be adjusted; hidden test + rubric must st
 |---|---|---|
 | 1 | Built from the agent template (`prometheus_core/agent-template`); a `PrometheusAgent` subclass | Read `agent.py` at the submitted SHA |
 | 2 | At least **two skills**, extract and plot, with team-prefixed IDs | Read `agent_card.json`; fetch the live card through `client-agent` (command below) |
-| 3 | Registers with the platform; appears under `/agents` | `curl -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/agents`, then `/agents` in the chat |
+| 3 | Registers with the platform; appears under `/agents` | `curl -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents`, then `/agents` in the chat |
 | 4 | Natural-language requests are **routed by the orchestrator** | The practice prompt on the practice file calls both skills; the status stream or client-agent log shows the calls |
 | 5 | Extract emits a table artifact; plot emits an **image** that renders | `/artifacts` lists both; the PNG shows in the chat |
-| 6 | Tests pass and lint is clean | Fresh clone of the SHA: `uv sync`, the SDK (below), `uv run pytest && uv run ruff check .` |
+| 6 | Tests pass and lint is clean | Fresh clone of the SHA: `uv lock --check`, `uv sync`, the SDK (below), `uv run pytest && uv run ruff check .` (the template's tests include `test_build_app_loads_agent_card`) |
 | 7 | Every merged PR reviewed (owner reviews teammates; a teammate reviews the owner) | `gh pr list --repo <owner>/<team>-agent --state merged --json number,author,reviews`: each merged PR has an approval from someone other than its author |
 
 ```bash {.xs}

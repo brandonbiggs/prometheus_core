@@ -1,12 +1,12 @@
 # Agent code: the `_execute` contract
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 You write one class with one method, plus `agent_card.json` (deck 04, slides 2-3). The base class
 `PrometheusAgent` (`prometheus_api/prometheus_api/agent/base.py:570`) gives the A2A server, the card, the
 registration, auth, the task lifecycle, heartbeats, and the helpers (deck 04, A2). Short paths: `base.py` is in
-`prometheus_api/prometheus_api/agent/`; `orchestrator/...` and `tool_discovery.py` are in
-`prometheus_platform/agents/client-agent/`; `agent_template/...` is in `prometheus_agent_template/`.
+`prometheus_core/sdk/prometheus_api/agent/`; `orchestrator/...` and `tool_discovery.py` (at the client-agent root) are in
+`prometheus_core/platform/agents/client-agent/`; `agent_template/...` is in `prometheus_core/agent-template/`.
 
 ```python
 from typing import Any
@@ -33,8 +33,8 @@ class HelloAgent(PrometheusAgent):
 | `user_id` | the verified token; `local` without one | `base.py:471-477` |
 | `conversation_id`, `artifacts` | the client-agent adds them | `orchestrator/skills.py:95`, `orchestrator/agent_loop.py:879-884` |
 
-- Answers to your own input request are not in `params`: use `self.get_provided_inputs(context)`
-  (`asking-the-user.md`).
+- Answers to your own input request arrive merged into `params`; `self.get_input_sources(context)`
+  says who supplied each value (`asking-the-user.md`).
 - A test or a workflow can call you without a required field. Check every value you need.
 - `str(context.context_id)` is the conversation id, the key for state.
 - The base class logs only the sorted keys, never the values (`base.py:479`; REQ-009-03).
@@ -76,7 +76,7 @@ The client-agent checks the `error` key, not `status`: always put a non-empty `e
 | `send_status_update(context, eq, message=...)` | a live progress line (needs `streaming: true`); always write `message=` | 1528 | - |
 | `send_conversation_message(context, eq, message)` | a message that stays in the chat | 1876 | - |
 | `send_json_artifact(...)`, `send_deeplynx_artifact(...)`, `get_artifact_file_path(...)` | artifacts | 1642, 1741, 1196 | `artifacts.md` |
-| `send_input_required(...)`, `get_provided_inputs(...)`, `load_context_state` / `save_context_state` | ask the user, keep state | 1033, 983, 975 | `asking-the-user.md` |
+| `send_input_required(...)`, `get_input_sources(...)`, `load_context_state` / `save_context_state` | ask the user, keep state | 1096, 1047, 1038 | `asking-the-user.md` |
 | `declare_long_running(...)`, `run_worker(...)` | long or blocking work | 1551, 1592 | `long-running.md` |
 | `llm_client(context, config=cfg)` | the async LLM client | 1000 | `llm.md` |
 

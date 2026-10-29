@@ -1,6 +1,6 @@
 # The agent card
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 Short paths: `base.py` and `registry.py` are in `prometheus_api/prometheus_api/agent/`; `orchestrator/...`,
 `capability_cache.py`, `tool_discovery.py`, `artifact_handling.py`, and `param_schema.py` are in

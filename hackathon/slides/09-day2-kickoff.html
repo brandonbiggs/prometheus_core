@@ -117,7 +117,7 @@ The orchestrator chains them: skill 1 runs, returns the table's id and column na
 <div class="col">
 <div class="steps">
 <div class="step"><div><h4>Scaffold the team agent</h4>
-<p class="small"><code>/create-agent</code> in Claude Code, or <code>setup_agent.py</code> from the agent template. You pick the agent's name and the repo's name.</p>
+<p class="small"><code>/create-agent</code> in Claude Code, or <code>setup_agent.py</code> from the agent template. You pick the agent's name and the repo's name. Add libraries with <code>uv add</code>; commit <code>uv.lock</code>.</p>
 </div></div>
 <div class="step"><div><h4>Two stub skills, routed</h4>
 <p class="small">Add both skills to <code>agent_card.json</code> and a dispatch on <code>params[&quot;skill_id&quot;]</code>. Upload the almanac and check that the orchestrator calls both, in order.</p>
@@ -211,7 +211,7 @@ Whatever you build, do it in small PRs. Your extras are part of the story you te
 
 <div class="card acc">
 <h4>Fork and branch</h4>
-<p class="small">Everyone else runs <code>gh repo fork &lt;owner&gt;/&lt;repo&gt; --clone</code>, works on a <code>feature/…</code> branch, and runs <code>git pull --rebase upstream main</code> often.</p>
+<p class="small">Everyone else runs <code>gh repo fork &lt;owner&gt;/&lt;repo&gt; --clone</code>, works on a <code>feature/…</code> branch, and rebases on <code>upstream/main</code> until review starts; after that, merge instead of force-pushing.</p>
 </div>
 
 <div class="card acc">

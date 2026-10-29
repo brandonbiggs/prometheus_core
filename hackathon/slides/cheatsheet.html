@@ -69,6 +69,10 @@ make up              # build, start, register
 make logs            # your tracebacks are here
 docker restart &lt;slug&gt;-agent   # after a PLATFORM restart
 
+# registered? (AGENT_SECRET from your .env)
+curl -s -H "Authorization: Bearer $AGENT_SECRET" \
+  localhost:8600/v1/agents | grep -o '"agent_name": *"[^"]*"'
+
 # in the chat
 /agents   /artifacts   /tasks
 
@@ -121,33 +125,30 @@ return {"status": "success", "artifact_id": ref.artifact_id}</pre>
                               message="Parsing 4 tables…")
 
 from prometheus_api.agent import MissingInput
-ctx = str(context.context_id)
-self.save_context_state(ctx, {"table": table_id})
-await self.send_input_required(context, event_queue,
+if not params.get("x_column"):
+  await self.send_input_required(context, event_queue,
     missing_inputs=[MissingInput(name="x_column",
         type="enum", options=list(df.columns),
         description="x axis column",
         user_prompt="Which column goes on the x axis?")],
     hint="Choose the columns to plot.")
-return {}
-# resumed call: self.get_provided_inputs(context)</pre>
+  return {}
+# resumed call: the answer is in params["x_column"],
+# next to all the original arguments</pre>
     </section>
 
     <section>
       <h2>LLM</h2>
-<pre>import os
-from prometheus_api.llm_client import (
-    LLMConfig, ToolDefinition, acall_tool)
+<pre>from prometheus_api.llm_client import (
+    LLMClientError, ToolDefinition, acall_tool)
 
-cfg = LLMConfig.from_env()          # profile from .env
-if cfg.proxy_url:                   # platform proxy only
-    cfg = cfg.with_api_key(os.getenv("LITELLM_MASTER_KEY"))
-async with self.llm_client(context, config=cfg) as llm:
+# profile and key come from .env; catch LLMClientError
+async with self.llm_client(context) as llm:
     r = await llm.small("…")          # r.text
     call = await acall_tool(llm, prompt, tool=PICK,
                             model="small")
     idx = call.arguments["index"]</pre>
-      <p>Flavors: <code>small</code>, <code>medium</code>, <code>large</code>, <code>vision</code>, <code>embedding</code>. Provider in your agent's <code>.env</code>: <code>LLM_CONFIG_PROFILE=inl_litellm</code>, <code>amsc</code> or <code>anl_asksage</code>, plus that provider's key in <code>LLM_API_KEY</code> (the same variable for every profile). <code>setup_agent.py</code> copies both from <code>platform/.env</code>.</p>
+      <p>Flavors: <code>small</code>, <code>medium</code>, <code>large</code>, <code>vision</code>, <code>embedding</code>. Provider in your agent's <code>.env</code>: <code>LLM_CONFIG_PROFILE</code> (required: <code>anthropic</code>, <code>openai</code>, <code>genesis</code>, <code>ollama</code>, <code>amsc</code>, <code>anl_asksage</code>, <code>inl_hpc</code>, <code>inl_litellm</code>), plus that provider's key in <code>LLM_API_KEY</code> (the same variable for every profile). <code>setup_agent.py</code> copies both from <code>platform/.env</code>.</p>
     </section>
 
     <section>
@@ -159,7 +160,7 @@ async with self.llm_client(context, config=cfg) as llm:
       </ul>
       <h2>Packaging</h2>
       <ul>
-        <li>Your imports in <code>pyproject.toml</code> (pandas, matplotlib); never <code>prometheus_api</code></li>
+        <li><code>uv add pandas matplotlib</code>, then commit <code>pyproject.toml</code> <b>and</b> <code>uv.lock</code>; never <code>prometheus_api</code></li>
         <li><code>MPLBACKEND=Agg</code>; a <code>COPY</code> line in the <code>Dockerfile</code> per extra module</li>
         <li><code>uv run pytest</code> and <code>uv run ruff check .</code> must pass (first <code>uv pip install -e ~/prometheus/prometheus_core/sdk</code>)</li>
       </ul>
@@ -172,12 +173,14 @@ async with self.llm_client(context, config=cfg) as llm:
         <tr><td>Not in <code>/agents</code></td><td><code>docker restart &lt;slug&gt;-agent</code>, else <code>make up</code>; <code>make logs</code></td></tr>
         <tr><td>Base image <code>unauthorized</code></td><td><code>LOCAL_SDK=true</code> in <code>platform/.env</code>; re-run <code>setup_agent.py</code> or set <code>PROMETHEUS_API_BASE_IMAGE_REPO=prometheus_api</code>, <code>…_HASH=local</code> in the agent <code>.env</code></td></tr>
         <tr><td>Never called</td><td>sharpen <code>description</code> / <code>usage_notes</code></td></tr>
-        <tr><td>LLM 401</td><td>the profile's key in <code>.env</code></td></tr>
-        <tr><td>"Unknown LLM config profile"</td><td>check the <code>LLM_CONFIG_PROFILE</code> spelling</td></tr>
+        <tr><td>Agent exits at startup</td><td><code>make logs</code>: <code>DEEPLYNX_*</code> missing (required for every agent), or <code>LLM_CONFIG_PROFILE</code> unset</td></tr>
+        <tr><td><code>uv.lock not found</code> / out of date</td><td><code>uv sync</code>, commit <code>uv.lock</code>, <code>make up</code></td></tr>
+        <tr><td><code>LLMProviderError</code> 401</td><td><code>LLM_API_KEY</code> in <code>.env</code></td></tr>
+        <tr><td><code>LLMConfigError</code></td><td><code>LLM_CONFIG_PROFILE</code> spelling; the message lists the profiles</td></tr>
         <tr><td>Upload ignored, plot missing</td><td>DeepLynx settings; <code>mime_type="image/png"</code></td></tr>
         <tr><td>"not stored as a platform artifact"</td><td>re-upload in a fresh conversation; <code>docker logs client-agent 2&gt;&amp;1 | grep 'Failed to upload'</code></td></tr>
-        <tr><td>"No 'userToken' found"</td><td>activate a signing key (Admin)</td></tr>
-        <tr><td><code>ModuleNotFoundError</code></td><td><code>pyproject.toml</code>, Dockerfile <code>COPY</code></td></tr>
+        <tr><td>"No 'userToken' found"</td><td>platform backend log: <code>ADMIN_DB_ENCRYPTION_KEY</code> set? (the signing key is created automatically)</td></tr>
+        <tr><td><code>ModuleNotFoundError</code></td><td><code>uv add</code> it; Dockerfile <code>COPY</code></td></tr>
       </table>
     </section>
   </div>

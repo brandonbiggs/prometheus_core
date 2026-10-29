@@ -1,15 +1,15 @@
 # Conventions for the hackathon skills
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 ## Find the folders
 
 - The root is `git rev-parse --show-toplevel`. A session can start in a subfolder: start from the root.
-- The platform is `<root>/../prometheus_platform`, the template `<root>/../prometheus_agent_template`.
+- The platform is `<root>/../prometheus_core/platform`, the template `<root>/../prometheus_core/agent-template`.
   When one is missing, ask for its path once, and use it for the session.
 - The Bash tool resets the working folder between calls. Put `cd` and its command in one call.
 - Ports: read them from the platform `.env`, else the defaults that the KB shows: `FRONTEND_DEV_PORT` 5150
-  (the UI), `FRONTEND_PROD_PORT` 8080, `BACKEND_PORT` 8600, `LITELLM_LOCAL_PORT` 9977, `REDIS_LOCAL_PORT` 6379.
+  (the UI), `FRONTEND_PROD_PORT` 8080, `BACKEND_PORT` 8600 (also the agent registry), `REDIS_LOCAL_PORT` 6379.
 
 ## Find your agent
 
@@ -28,9 +28,9 @@ an editor, then you check with `grep -c`. Settings you may print with an exact `
 - Never run `cat .env`; `env`, `printenv`, or `docker exec <c> env` without a name filter;
   `docker compose config`; `docker inspect`; `curl -v`; `set -x`.
 - Load a key and use it in the same Bash call. Never echo it:
-  `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/models`
-- `GET /v1/agents` returns each agent's `static_headers`, which hold `AGENT_SECRET`. Print only the names:
-  `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/agents | python3 -c 'import json,sys; print(sorted(a["agent_name"] for a in json.load(sys.stdin)))'`
+  `set -a; source <platform>/.env; set +a; curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents`
+- `GET /v1/agents` never returns `static_headers`, but the cards are long. Print only the names:
+  `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents | python3 -c 'import json,sys; print(sorted(a["agent_name"] for a in json.load(sys.stdin)))'`
 - Compare without printing: `cmp -s <(grep '^AGENT_SECRET=' <platform>/.env) <(grep '^AGENT_SECRET=' <agent>/.env) && echo same`
 - Never commit a `.env` (the root `.gitignore` ignores `.env*`). A pasted secret must be rotated.
 
@@ -61,11 +61,11 @@ or a background task (`/tasks`), and say what the restart stops.
 
 Ask before each one, and say why: an `.env` or `docker-compose.override.yml` edit; `docker login`;
 `make clear-admin-users`; a platform target that empties the registry (`make up`, `up-fg`, `restart`,
-`restart-fg`, `ng-up`, `ng-up-fg`, `ng-restart`, `ng-restart-fg`, `clear-litellm-db`, `down-v`).
+`restart-fg`, `ng-up`, `ng-up-fg`, `ng-restart`, `ng-restart-fg`, `clear-agent-registry`, `down-v`).
 Before one, or a platform `make down`, run `make down` in the agent folder (else "has active
 endpoints"); after it, `make up` in the agent folder. Before `make down-v`, state the loss: all
 conversations and sessions, the registry, the admin users, the signing keys, the identity-provider
-settings, and the mesh cache. Then the setup wizard and a new signing key are necessary.
+settings, and the mesh cache. Then the setup wizard is necessary (the backend creates a new signing key).
 
 ## Open a file in the browser
 

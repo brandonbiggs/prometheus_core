@@ -5,9 +5,9 @@ is the agent name. KB: `card.md`, `agent-code.md`, `run-and-register.md`, `testi
 
 ## 1. Preconditions
 
-Check with a mark each: `test -f <platform>/.env`; `make ps` in `<platform>` shows `litellm-proxy`,
-`backend`, `client-agent`, `agent-valkey`; `curl -s localhost:8600/healthz` gives
-`{"status":"ok"}`; `uv --version`; Python 3.9+. On a fail, send to `/diagnose check my laptop`.
+Check with a mark each: `test -f <platform>/.env`; `make ps` in `<platform>` shows `backend`,
+`client-agent`, `agent-valkey`, `admin-db`; `curl -s localhost:8600/healthz` gives
+`{"status":"ok"}`; `uv --version`; Python 3.9+; the platform `.env` has `DEEPLYNX_KEY`, `DEEPLYNX_ORG_ID` and `DEEPLYNX_PROJECT_ID` (`grep -c`; agents exit at startup without them). On a fail, send to `/diagnose check my laptop`.
 
 ## 2. Day 1 or Day 2
 
@@ -52,7 +52,7 @@ the plan. Ask (header `Plan`): "Looks right (Recommended)", "Change something".
 3. List the registered names and skill ids:
 
    ```sh
-   set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/agents | python3 -c 'import json, sys; [print(a.get("agent_name"), sorted(s.get("id") for s in (a.get("agent_card_params") or {}).get("skills", []))) for a in json.load(sys.stdin)]'
+   set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents | python3 -c 'import json, sys; [print(a.get("agent_name"), sorted(s.get("id") for s in (a.get("agent_card_params") or {}).get("skills", []))) for a in json.load(sys.stdin)]'
    ```
 
    The route key must not be listed: the same key deletes the other agent's entry
@@ -102,11 +102,12 @@ cd <template> && printf 'yes\n' | python3 -B -c 'import json, sys, pathlib, setu
 
 ## 7. Complete the agent `.env`
 
-The scaffolder copies the platform secrets but not the pin, the LLM key, or
-`USER_IDENTITY_REQUIRED` (`setup_agent.py:22-37`). Show the planned edits as key names. Ask
+The scaffolder copies the platform secrets, `LLM_CONFIG_PROFILE`, `LLM_API_KEY`, `DEEPLYNX_*`, and
+`LOCAL_SDK=true`, but not a hash pin or `USER_IDENTITY_REQUIRED` (`setup_agent.py:48-66`). Show the planned edits as key names. Ask
 (header `.env edits`): "Apply the edits (Recommended)", "Skip". Check each result with `grep -c`.
 
-1. The pin:
+1. The pin, only when the platform `.env` has no `LOCAL_SDK=true` (`grep -c '^LOCAL_SDK=true' <OUTPUT_DIR>/.env`
+   is then 0):
 
    ```sh
    pin=$(sed -n 's/^PROMETHEUS_API_BASE_IMAGE_HASH=\([^[:space:]#]*\).*/\1/p' <platform>/.env | tail -n 1); [ -n "$pin" ] || pin=$(sed -n 's/^PROMETHEUS_API_BASE_IMAGE_HASH ?= *\([^[:space:]#]*\).*/\1/p' <platform>/Makefile | head -n 1); echo "pin: $pin"
@@ -115,8 +116,8 @@ The scaffolder copies the platform secrets but not the pin, the LLM key, or
    When `grep -c '^PROMETHEUS_API_BASE_IMAGE_HASH=.' <OUTPUT_DIR>/.env` is 0, append
    `printf '\nPROMETHEUS_API_BASE_IMAGE_HASH=%s\n' <pin> >> <OUTPUT_DIR>/.env`. Without it the agent
    builds from `latest` (deck 02, A5).
-2. The LLM key: read `LLM_CONFIG_PROFILE` from the agent `.env` (empty means `registry`).
-   `registry` needs none. Otherwise the key is `LLM_API_KEY` (`llm.md` "## Profile to key map");
+2. The LLM key: read `LLM_CONFIG_PROFILE` from the agent `.env`; it must be set (compose stops
+   otherwise) and not `registry`. `ollama` needs no key; otherwise it is `LLM_API_KEY` (`llm.md` "## Profile to key map");
    `setup_agent.py` normally copies it. When the agent `.env` lacks it and the platform has a real
    value, copy the line without showing it:
    `{ [ -n "$(tail -c 1 <OUTPUT_DIR>/.env)" ] && echo; grep '^<KEY>=' <platform>/.env | tail -n 1; } >> <OUTPUT_DIR>/.env`.
@@ -173,18 +174,20 @@ Day 2:
 
 ## 9. Test, run, and register
 
-1. `cd <OUTPUT_DIR> && uv sync && uv pip install "git+https://github.inl.gov/genesis/prometheus_api.git@<pin>"`
-   (or `git+ssh://git@github.inl.gov/...`; why: `testing.md`). Then
-   `uv run pytest && uv run ruff check .`. Explain each failure before a fix.
-2. `make up`. "must be launched first" or "pull access denied": send the user to
-   `/diagnose check my laptop`.
+1. `cd <OUTPUT_DIR> && uv sync && uv pip install <platform>/../sdk` (the SDK from the
+   monorepo clone; why and other sources: `testing.md`). `uv sync` creates `uv.lock`: commit it with `pyproject.toml` (the build stops without
+   it). Add packages with `uv add <pkg>`. Then `uv run pytest && uv run ruff check .`; pytest includes
+   `test_build_app_loads_agent_card`. Explain each failure before a fix.
+2. `make up`. "must be launched first", "pull access denied", "uv.lock not found", or an exit with
+   "Invalid required DeepLynx configuration": send the user to `/diagnose check my laptop`.
 3. Wait for the registration (never `make logs`; when `sleep` is refused, `run_in_background`):
 
    ```sh
    for i in $(seq 15); do docker logs <slug>-agent 2>&1 | grep "Registered '" && break; sleep 2; done
    ```
 
-   Expect `Registered '<route key>' with LiteLLM`. Else send the user to `/diagnose`.
+   Expect `Registered '<route key>' with LiteLLM at http://backend:8000` (old SDK wording; the URL is
+   the backend). Else send the user to `/diagnose`.
 4. Run the discovery refresh of `conventions.md` (on a fail, `docker restart client-agent`).
 
 ## 10. Day 1: chat, then the practice files

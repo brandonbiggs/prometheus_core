@@ -2,7 +2,7 @@
 
 Add one platform feature to the user's agent: teach it, write the plumbing, test, and run. The
 argument, when given, names the feature. Agent code picks LLM flavors, imports no provider SDK,
-hard-codes no model ID, and attaches `LITELLM_MASTER_KEY` only when `cfg.proxy_url` is set.
+hard-codes no model ID, and calls `self.llm_client(context)` with no key swap.
 
 ## 1. Find the agent and the feature
 
@@ -23,9 +23,9 @@ the KB file, the reference, and what changes in the card, the code, and the chat
 | Publish a JSON table | `artifacts.md` | `agents/debug-agents/corrosion-agent/agent.py:234-242`; a custom viewer: `thermal-agent/agent.py:301-309` | nothing | `send_json_artifact(..., catalog_artifact=True)`; return the id | a JSON tree; `/artifacts` lists it |
 | Publish a PNG | `artifacts.md` | `artifact-debug-agent/agent.py:262-302`; storage config `:30-35` | nothing | render in a thread, `send_deeplynx_artifact(..., mime_type="image/png")` | the image viewer |
 | Status updates | `agent-code.md` | `artifact-debug-agent/agent.py:148-158`; card `:5-8` | `capabilities.streaming: true` | `send_status_update`, `send_conversation_message` | live progress lines |
-| Ask the user | `asking-the-user.md` | `corrosion-agent/agent.py:112-168` | the asked input stays optional | `send_input_required`, `save_context_state`, `return {}`; then `get_provided_inputs` | a form, then a second run |
+| Ask the user | `asking-the-user.md` | `corrosion-agent/agent.py:112-168` | the asked input stays optional | `send_input_required`, `return {}`; on the resume the answer is in `params` | a form, then a second run |
 | Approval | `asking-the-user.md` | `corrosion-agent/agent_card.json:15` | `"requires_approval": true` | nothing | Approve and Reject |
-| Call an LLM | `llm.md` | `agents/synthesis-agent/agent.py:61-69` only (deck 04, A6 forbids its blanket `except`) | nothing | `LLMConfig.from_env()`, the master key when `proxy_url`, `self.llm_client` | the answer text |
+| Call an LLM | `llm.md` | `agents/synthesis-agent/agent.py:61-69` only (deck 04, A6 forbids its blanket `except`) | nothing | `async with self.llm_client(context)`, catch `LLMProviderError` | the answer text |
 | Structured answer | `llm.md` | deck 04, slide 16; `prometheus_api/llm_client/tools.py:335-352` | nothing | `ToolDefinition.from_pydantic`, `acall_tool(..., model=...)` | a reliable value |
 | Long work | `long-running.md` | `debug-agents/thread-pattern-agent/agent.py:57-207`; `asyncio.to_thread`: `osti-research-agent/agent.py:1081` | `capabilities.streaming: true` | `asyncio.to_thread`, or `PrometheusWorker` + `run_worker` + `declare_long_running` | progress; `/tasks` |
 | A second skill | `card.md`, `agent-code.md` | `material-data-agent/agent.py:198-258`; `artifact-debug-agent/agent.py:429-453` (return an error dict for an unknown skill) | a new prefixed skill entry | a `skill_id` dispatch | a new tool |
@@ -52,10 +52,10 @@ description, `usage_notes`, and inputs (`card.md`). Uploads and PNGs need DeepLy
 `grep -c '^DEEPLYNX_KEY=.' <agent>/.env` and `grep -c '^DEEPLYNX_PROJECT_ID=.' <agent>/.env`.
 On a 0, offer "## Local DeepLynx" of `artifacts.md` or `/diagnose check my laptop` first.
 
-LLM rows: read the flavors first (`llm.md`). Under `registry`, list them:
-`set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/models | python3 -c 'import json,sys; print(sorted(m["id"] for m in json.load(sys.stdin)["data"]))'`.
-Pick one that exists (today `medium`, not the deck's `small`). Teach `LLMAliasError` in two
-lines. Under a direct profile, check the key in the container:
+LLM rows: read the flavors first (`llm.md`). List them for the agent's profile:
+`grep 'model_name:' <platform>/../sdk/prometheus_api/llm_configs/$(grep '^LLM_CONFIG_PROFILE=' <agent>/.env | tail -n 1 | cut -d= -f2).yaml`.
+Pick one that exists. Teach `LLMAliasError` and `LLMProviderError` in two lines. Check the key
+in the container:
 `docker exec <container> sh -c 'test -n "$<KEY>" && echo set || echo missing'`.
 
 ## 4. Write, test, run

@@ -194,14 +194,14 @@ Write **one agent**: a Python class with a method that does the work, and a card
 <div class="arrow-v"><span>supporting services</span></div>
 <div class="row" style="gap:20px; align-items:stretch">
 <div class="box gray" style="flex:1"><b>Registry</b><span class="small">agents announce themselves at startup</span></div>
-<div class="box gray" style="flex:1"><b>LLM gateway</b><span class="small">one key, many models</span></div>
+<div class="box gray" style="flex:1"><b>LLM profile</b><span class="small">one key, many models</span></div>
 <div class="box teal" style="flex:1"><b>DeepLynx</b><span class="small">stores uploads and result files</span></div>
 <div class="box gray" style="flex:1"><b>State store</b><span class="small">conversations, artifacts, background tasks</span></div>
 </div>
 </div>
 
 {.small}
-All of it runs on your laptop in Docker. The registry and the LLM gateway are one service, LiteLLM. The appendix lists every container.
+All of it runs on your laptop in Docker. The backend is also the agent registry; each agent calls its LLM provider directly, picked by `LLM_CONFIG_PROFILE`. The appendix lists every container.
 
 ---
 
@@ -247,7 +247,7 @@ The PNG artifact renders in the conversation, with the orchestrator's summary.
 | **Orchestrator** | The client agent: an LLM loop that calls skills and chains them |
 | **Artifact** | A file or data result in the conversation (an upload, a table, a plot) |
 | **DeepLynx** | INL's data store, where uploads and result files live |
-| **Registry** | Where running agents announce themselves (LiteLLM) |
+| **Registry** | Where running agents announce themselves (the backend's `/v1/agents`) |
 | **Flavor** | The kind of LLM you ask for in code: `small`, `medium`, `large`, `vision`… |
 
 ---
@@ -359,7 +359,7 @@ For participants who could not finish the homework. Work through these with a me
 | Platform cloned | `ls ~/prometheus/prometheus_core` shows `platform`, `sdk`, `agent-template` | deck 02 bonus (clone commands) |
 | Base image builds | `LOCAL_SDK=true` in `platform/.env`, then `make base-image` in `prometheus_core/platform` | deck 03 bonus (step 1) |
 | Platform starts | `make up` in `prometheus_core/platform`, then `http://localhost:5150` | deck 03 bonus (`.env`, "the stack won't start") |
-| DeepLynx (if no `deeplynx.inl.gov` access) | `http://localhost:3000` shows the DeepLynx UI | deck 03 bonus (local DeepLynx) |
+| Local DeepLynx (**required**: no agent starts without it) | `http://localhost:3000` shows the DeepLynx UI | deck 03 (local DeepLynx) |
 | `uv` (for the agent session) | `uv --version` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `gh` (decks 02 and 05) | `gh auth status` | `brew install gh` (needs admin), or copy the release binary from `github.com/cli/cli/releases` into `~/.local/bin`; then `gh auth login`. No `gh`? Use the Fork and "Compare & pull request" buttons on the web. |
 
@@ -412,10 +412,10 @@ Any service that speaks A2A and publishes a card can join. It can live in the pl
 <div class="center" style="min-height:0"><img alt="Platform tiers schematic" class="fit" src="assets/platform_schema.png" style="max-height:640px"/></div>
 <div class="col" style="justify-content:center; gap:14px">
 <div class="card"><h4>Client</h4><p class="small">The user and the web frontend. Today that is a React single-page app (the diagram's "e.g. Chainlit" is historical).</p></div>
-<div class="card"><h4>App server tier</h4><p class="small">The orchestrator agent, the state store (Valkey), and the <b>LiteLLM gateway</b>. LiteLLM is three things at once: agent registry, A2A gateway, and LLM proxy.</p></div>
+<div class="card"><h4>App server tier</h4><p class="small">The backend, the orchestrator agent, and the state store (Valkey). The <b>backend</b> is also the agent registry and A2A gateway; agents call LLM providers directly.</p></div>
 <div class="card"><h4>Agent runtime tier: pluggable slots</h4><p class="small">Any A2A-conformant agent registers and appears here. Each agent wraps a backend tool: a hosted service, licensed software, or an HPC code.</p></div>
 <div class="card"><h4>DeepLynx data layer</h4><p class="small">Stores uploads and agent outputs with provenance. <code>deeplynx://</code> URIs let agents hand files to each other.</p></div>
-<div class="card"><h4>Model development pipeline</h4><p class="small">Long-term vision: training, validation, and a model registry that serves models to the gateway. Not needed for the hackathon.</p></div>
+<div class="card"><h4>Model development pipeline</h4><p class="small">Long-term vision: training, validation, and a model registry that serves models to the agents. Not needed for the hackathon.</p></div>
 </div>
 </div>
 
@@ -431,7 +431,7 @@ Any service that speaks A2A and publishes a card can join. It can live in the pl
 | **Agent card** | `agent_card.json`: name, description, capabilities, skills. Its skill descriptions, `usage_notes`, and schemas are what the orchestrator LLM reads to decide whether and how to call you. |
 | **A2A** | Agent-to-Agent protocol, v1.0: JSON-RPC 2.0 over HTTP (`SendMessage`, `SendStreamingMessage`). |
 | **Client agent** | The orchestrator / planner. It plans, collects parameters, dispatches, and aggregates. |
-| **Registry / gateway** | LiteLLM. Agents `POST /v1/agents` to register; the orchestrator calls them via `/a2a/{agent_name}`. |
+| **Registry / gateway** | The backend. Agents `POST /v1/agents` to register; the orchestrator calls them via `/a2a/{agent_name}`. Stored in Valkey. |
 
 ---
 
@@ -444,7 +444,7 @@ Any service that speaks A2A and publishes a card can join. It can live in the pl
 | **DeepLynx** | INL's data warehouse. It stores uploads and agent files and resolves `deeplynx://organizations/…/items/N`. |
 | **Workflow** | A YAML template that chains skills (sequential, parallel, or DAG) with parameter bindings between steps. |
 | **contextId** | The conversation ID. It scopes artifacts, state, and ownership across all agents in one chat. |
-| **Flavor / profile** | An LLM *flavor* (`small`, `medium`, `large`…) is chosen in code; a *profile* chosen by deployment maps flavors to real models. With the default `registry` profile, flavors are looked up in the platform's LiteLLM proxy (`litellm_config.yaml`). |
+| **Flavor / profile** | An LLM *flavor* (`small`, `medium`, `large`…) is chosen in code; a *profile* chosen by deployment maps flavors to real models. `LLM_CONFIG_PROFILE` has no default (`anthropic`, `openai`, `genesis`, `ollama`, …); every profile reads `LLM_API_KEY`. |
 | **Base image** | `prometheus_api:local`, built on your laptop from `sdk/` when `LOCAL_SDK=true` is in `platform/.env`. Every Python agent is built `FROM` it. |
 
 ---
@@ -463,13 +463,13 @@ Any service that speaks A2A and publishes a card can join. It can live in the pl
 <div class="arrow-h" style="width:60px"><span>A2A</span></div>
 <div class="box navy" style="width:330px"><b>client-agent</b><span>orchestrator · :8000 (internal)</span><span class="mono">tool-calling loop · workflows</span></div>
 </div>
-<div class="row" style="justify-content:flex-end; padding-right:150px"><div class="arrow-v" style="width:40px"><span>A2A + discovery</span></div></div>
+<div class="row" style="justify-content:flex-end; padding-right:150px"><div class="arrow-v" style="width:40px"><span>discovery + A2A</span></div></div>
 <div class="row" style="gap:18px; align-items:stretch">
 <div class="box teal" style="width:240px"><b>redis</b><span>Valkey 9.1 · :6379</span><span class="mono">agent-valkey</span></div>
-<div class="box gray" style="width:250px"><b>litellm-db / admin-db</b><span>Postgres 16 ×2</span><span class="mono">registrations · users/keys</span></div>
-<div class="box orange" style="flex:1"><b>litellm (litellm-proxy)</b><span>v1.92.0 · host :9977 → :4000</span><span class="mono">① agent registry  ② A2A gateway  ③ LLM proxy</span></div>
+<div class="box gray" style="width:250px"><b>admin-db</b><span>Postgres 16</span><span class="mono">users · keys · OIDC</span></div>
+<div class="box orange" style="flex:1"><b>backend: agent registry + A2A gateway</b><span>GET/POST /v1/agents · POST /a2a/{agent_name}</span><span class="mono">registrations in Valkey · Bearer AGENT_SECRET</span></div>
 </div>
-<div class="arrow-v"><span>POST /a2a/{agent_name}</span></div>
+<div class="arrow-v"><span>POST /a2a/{agent_name} → the agent's registered URL</span></div>
 <div class="row" style="gap:14px">
 <div class="box green" style="flex:1"><b>form-filler-agent</b></div>
 <div class="box green dash" style="flex:1"><b>osti-research-agent</b><span class="mono">OPTIONAL_AGENTS=true</span></div>
@@ -480,7 +480,7 @@ Any service that speaks A2A and publishes a card can join. It can live in the pl
 </div>
 
 {.tiny}
-All containers share one bridge network, `prometheus_platform_agent-network`. The backend is the only component the browser talks to, and only the ports shown are published to your host.
+All containers share one bridge network, `prometheus_platform_agent-network`. The backend is the only component the browser talks to, and only the ports shown are published to your host. Agents call their LLM provider directly (`LLM_CONFIG_PROFILE`); there is no LLM proxy.
 
 ---
 
@@ -491,12 +491,10 @@ All containers share one bridge network, `prometheus_platform_agent-network`. Th
 |---|---|---|---|---|
 | **frontend-dev** | `frontend-dev` | `frontend/Dockerfile` target `dev` | 5150 | Vite dev server (profile `dev`, the default) |
 | **frontend-prod** | `frontend-prod` | same, target `prod` (nginx) | 8080 | Built SPA (profile `prod`) |
-| **backend** | `backend` | `./backend` (FROM prometheus_api) | 8600 | Login, sessions, chat turn, SSE events, uploads, artifact bytes, admin UI API, mesh conversion |
+| **backend** | `backend` | `./backend` (uv image + `../sdk`) | 8600 | Login, sessions, chat turn, SSE, uploads, artifacts, admin API, mesh conversion, **agent registry + A2A gateway** |
 | **client-agent** | `client-agent` | `./agents/client-agent` | (8001 in system-test mode) | Orchestrator: tool-calling loop, follow-ups, approval, dispatch |
-| **litellm** | `litellm-proxy` | `ghcr.io/berriai/litellm:v1.92.0` | 9977 | Agent registry, A2A gateway, LLM proxy (`litellm_config.yaml`) |
-| **litellm-db** | `litellm-db` | `postgres:16-alpine` | — | LiteLLM state (agent registrations). **Wiped on every `make up`.** |
 | **admin-db** | `admin-db` | `postgres:16-alpine` | — | Users (bcrypt), OIDC providers, RS256 signing keys |
-| **redis** | `agent-valkey` | `valkey/valkey-bundle:9.1.0` | 6379 | Conversation state, browser sessions, SSE event bus, artifact catalog, task graph, caches |
+| **redis** | `agent-valkey` | `valkey/valkey-bundle:9.1.0` | 6379 | Conversation state, sessions, SSE bus, artifact catalog, task graph, caches, agent registry (**wiped on every `make up`**) |
 | **agents/\*** | per agent | `agents/<name>/docker-compose.yml` | — (8008 artifact-debug) | Included automatically by `make generate` |
 
 {.tiny}
@@ -532,7 +530,7 @@ It replies `needs_info` (follow-up form) or `plan_ready` (Approve/Reject). Your 
 |||
 
 <div class="steps" style="counter-reset: st 4">
-<div class="step"><div><h4>Dispatch</h4><p class="small"><code>POST litellm:4000/a2a/{agent_name}</code>, then LiteLLM forwards to the agent with <code>Bearer AGENT_SECRET</code>.</p></div></div>
+<div class="step"><div><h4>Dispatch</h4><p class="small"><code>POST backend:8000/a2a/{agent_name}</code>, then the backend forwards to the agent's registered URL with <code>Bearer AGENT_SECRET</code>.</p></div></div>
 <div class="step"><div><h4>Agent works</h4><p class="small"><code>_execute()</code> runs. Status updates stream back through client-agent → backend → SSE to the UI as they happen.</p></div></div>
 <div class="step"><div><h4>Artifacts</h4><p class="small">Outputs are registered in the conversation catalog (Valkey). Files usually live in DeepLynx as <code>deeplynx://…</code>.</p></div></div>
 <div class="step"><div><h4>Render</h4><p class="small">The backend attaches a <code>render_hint</code> (mesh, ifc, pdf, image, json…) and serves the bytes from <code>/api/artifacts/{id}/content</code>. The UI picks a viewer.</p></div></div>
@@ -551,7 +549,7 @@ It replies `needs_info` (follow-up form) or `plan_ready` (Approve/Reject). Your 
 - ->  {w=34}
 - [navy flex=1] **Validate** | JSON Schema, known artifact ids; errors go back to the model
 - ->  {w=34}
-- [navy flex=1] **Run** | A2A via LiteLLM; independent calls in parallel
+- [navy flex=1] **Run** | A2A via the backend gateway; independent calls in parallel
 - ->  {w=34}
 - [navy flex=1] **Result** | summary + artifact ids back into the transcript; repeat, ≤ 12 turns
 :::
@@ -636,12 +634,11 @@ Older docs show v0.3 syntax (`message/send`, `role: "user"`, `params.context.ski
 | Secret | Used between | What it proves / where it lives |
 |---|---|---|
 | **Session cookie** `prometheus_session` | Browser → backend | An HS256 JWT signed with `BACKEND_JWT_SECRET`. The backend refuses to start if it is empty or still the `change-me…` placeholder. Sessions live in Valkey. |
-| **`AGENT_SECRET`** | Backend → client-agent; LiteLLM → every agent | A shared bearer token. Agents reject any other token with 401. It is registered as LiteLLM `static_headers`. |
-| **`LITELLM_MASTER_KEY`** | Agents/orchestrator → LiteLLM | Lets agents register and the orchestrator discover and call agents. The LLM proxy also requires it. |
+| **`AGENT_SECRET`** | Everything ↔ backend registry and gateway; gateway → every agent | A shared bearer token. Agents reject any other token with 401. It also lets agents register and the orchestrator discover and call them (the SDK reads it from `LITELLM_MASTER_KEY`, which compose sets to `${AGENT_SECRET}`). |
 | **`userToken`** (RS256 JWT) | Backend → orchestrator → agents | The identity of the human user, minted per turn. Agents verify it against `JWKS_URL` (the backend's `/.well-known/jwks.json`). Required by default. |
 | **`ADMIN_DB_ENCRYPTION_KEY`** | Backend at rest | A Fernet key that encrypts OIDC client secrets and signing keys in admin-db. `make up` (`init-env`) generates it. |
-| **Provider key** | LiteLLM / agents → LLM API | `LLM_API_KEY`, the same variable for every profile. The LLM profile decides which provider it is for. |
-| **DeepLynx key + secret** | Agents/backend → DeepLynx | `DEEPLYNX_KEY/SECRET/ORG_ID/PROJECT_ID`. They are global by default (`CREDENTIAL_BROKER=env`), or per user via Vault. |
+| **Provider key** | Agents → LLM API | `LLM_API_KEY`, the same variable for every profile. `LLM_CONFIG_PROFILE` decides which provider it is for. |
+| **DeepLynx key + secret** | Agents/backend → DeepLynx | `DEEPLYNX_KEY/SECRET/ORG_ID/PROJECT_ID`; **every agent needs them to start**. They are global by default (`CREDENTIAL_BROKER=env`), or per user via Vault. |
 
 {.tiny}
 Reference: `platform/docs/docs/dev-docs/encryption-and-keys.md` and `multi-user-setup.md`, both current on `devel`.
@@ -684,7 +681,7 @@ The backend picks a viewer from `json_type`, then `mime_type`, tags, and file ex
 ::::
 
 ::: callout warn
-Without DeepLynx configured, user uploads are **not stored** and agents cannot see them; you only get a status message. We set up a local DeepLynx in the deployment session.
+DeepLynx is **required**. Every skill call writes an execution record there (`self.execution_record_id`), so an agent without DeepLynx credentials refuses to start, and uploads are not stored. We set up a local DeepLynx in the deployment session.
 :::
 
 ---
@@ -784,15 +781,15 @@ Note: These repos are in github.inl.gov/genesis and need INL network access and 
 
 <div class="dg">
 <div class="row" style="justify-content:center">
-<div class="box navy" style="width:560px"><b>sdk/</b> <span class="small">(formerly <code>prometheus_api</code>)</span><span>Python package <code>prometheus-api</code> (v0.13.0): PrometheusAgent, LLMClient, StorageClient, identity, artifacts</span></div>
+<div class="box navy" style="width:560px"><b>sdk/</b> <span class="small">(formerly <code>prometheus_api</code>)</span><span>Python package <code>prometheus-api</code> (v0.15.0): PrometheusAgent, LLMClient, StorageClient, identity, artifacts</span></div>
 </div>
 <div class="arrow-v"><span>LOCAL_SDK=true: make up builds prometheus_api:local from sdk/</span></div>
 <div class="row" style="gap:40px; justify-content:center">
-<div class="box sky" style="width:520px"><b>platform/</b><span>frontend, backend, client-agent, LiteLLM, in-tree agents. Every Python image is <code>FROM</code> <code>prometheus_api:local</code>.</span></div>
+<div class="box sky" style="width:520px"><b>platform/</b><span>frontend, backend (also the agent registry), client-agent, in-tree agents. Every agent image is <code>FROM</code> <code>prometheus_api:local</code>.</span></div>
 <div class="box orange" style="width:520px"><b>agent-template/</b> <span class="small">(formerly <code>prometheus_agent_template</code>)</span><span><code>setup_agent.py</code> scaffolds a new agent and copies the platform's secrets into its <code>.env</code>, including the switch to <code>prometheus_api:local</code>.</span></div>
 </div>
 <div class="row" style="gap:40px; justify-content:center">
-<div class="arrow-v" style="width:520px"><span>runtime only: register + A2A via LiteLLM</span></div>
+<div class="arrow-v" style="width:520px"><span>runtime only: register + A2A via the backend</span></div>
 <div class="arrow-v" style="width:520px"><span>scaffolds</span></div>
 </div>
 <div class="row" style="justify-content:center">
@@ -801,7 +798,7 @@ Note: These repos are in github.inl.gov/genesis and need INL network access and 
 </div>
 
 ::: callout
-One clone of `idaholab/prometheus_core` (default branch `devel`) holds all three directories; no submodules, and no pip dependency between platform and agents. The **base Docker image** delivers the SDK; the **registry** connects services at runtime. More on this at 1:00 pm.
+One clone of `idaholab/prometheus_core` (default branch `devel`) holds all three directories; no submodules, and no pip dependency between platform and agents. The **base Docker image** delivers the SDK; the backend's **registry** connects services at runtime. More on this at 1:00 pm.
 :::
 
 ---
@@ -818,6 +815,8 @@ One clone of `idaholab/prometheus_core` (default branch `devel`) holds all three
 | login `prometheus` / `prometheus` | a setup wizard creates the first admin |
 | image from mooseharbor, or a pinned registry image | built locally from `sdk/` with `LOCAL_SDK=true` |
 | `PROMETHEUS_DEBUG` | `DEBUG_AGENTS=true` |
+| LiteLLM on `:9977` is the registry / LLM proxy; `LITELLM_MASTER_KEY` | the backend (`:8600/v1/agents`, `Bearer AGENT_SECRET`); agents call providers directly |
+| `get_provided_inputs(context)`; "Admin › Signing Keys → generate" | answers arrive in `params`; the backend creates the signing key itself |
 | an up-front planner (`planner.py`), upload auto-binding (`file-uploads.md`) | the tool-calling loop, `orchestrator/agent_loop.py` (PR #104) |
 | pin `prometheus_api@2b3dbcf` (old template README/TUTORIAL) | an old-repo hash (v0.8.0); agents now build on `prometheus_api:local` |
 | repos `prometheus_api`, `prometheus_agent_template`, `prometheus_platform` | `sdk/`, `agent-template/` and `platform/` in `idaholab/prometheus_core`; old hashes were rewritten |

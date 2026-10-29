@@ -19,7 +19,7 @@ index:
 ### Check
 
 {.small}
-Your platform from the homework is up and current, and you are logged in with an active signing key.
+Your platform from the homework is up and current, local DeepLynx is running, and you are logged in.
 :::
 
 ::: card acc
@@ -79,19 +79,18 @@ make ps
 # verify
 set -a; source .env; set +a
 curl -s localhost:8600/healthz
-curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-     localhost:9977/v1/agents | python3 -m json.tool
+curl -s -H "Authorization: Bearer $AGENT_SECRET" \
+     localhost:8600/v1/agents | python3 -m json.tool
 ```
 
 |||
 
-1. Open `http://localhost:5150`; create the admin in the setup wizard if you haven't
-2. Admin › Signing Keys → **generate + activate**
-3. Chat: `/agents`, then ask a question
-4. Upload any small file: it should appear in DeepLynx
+1. Open `http://localhost:5150`; create the admin in the setup wizard if you haven't (the signing key is created for you)
+2. Chat: `/agents`, then ask a question
+3. Upload any small file: it should appear in your local DeepLynx (`http://localhost:3000`)
 
 ::: callout warn
-Platform not up yet? Use the **bonus slide** at the end of this deck, and the bonus section of deck 03.
+Platform or DeepLynx not up yet? Use the **bonus slide** at the end of this deck, and the DeepLynx slides of deck 03.
 :::
 ::::
 
@@ -105,6 +104,7 @@ python3 setup_agent.py "Hello <You>" ../../hello-<you>   # no ~
 #  → card "Hello <You> Agent"
 #  skill id: hello_<you>_greeting   (unique!)
 #  copy secrets from ../platform/.env? yes
+#  (also copies LLM_CONFIG_PROFILE, LLM_API_KEY, DEEPLYNX_*)
 cd ~/prometheus/hello-<you>
 
 # edit agent_card.json: skill description + usage_notes
@@ -117,7 +117,7 @@ cd ~/prometheus/hello-<you>
 #   return {"status": "success",
 #           "greeting": f"Hello, {name}, from <you>!"}
 
-uv sync
+uv sync          # creates uv.lock: commit it
 uv pip install -e ~/prometheus/prometheus_core/sdk
 uv run pytest    # update the tests; keep one send_status_update
 uv run ruff check .
@@ -133,8 +133,8 @@ make logs
 ```bash {.sm}
 # registered?
 docker logs hello-<you>-agent 2>&1 | grep "Registered '"
-curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-  localhost:9977/v1/agents | grep -o '"agent_name": *"[^"]*"'
+curl -s -H "Authorization: Bearer $AGENT_SECRET" \
+  localhost:8600/v1/agents | grep -o '"agent_name": *"[^"]*"'
 
 # make the orchestrator notice now (else ≤ 60 s)
 docker restart client-agent
@@ -153,7 +153,8 @@ docker restart client-agent
 | not in `/agents` | the platform was restarted: `docker restart hello-<you>-agent` |
 | never routed | sharpen the description; `docker restart client-agent` |
 | LLM 401 (if you added LLM calls) | the key for your `LLM_CONFIG_PROFILE` in `.env` |
-| `ModuleNotFoundError` in the container | add a `COPY` line to the Dockerfile |
+| exits at startup: "Invalid required DeepLynx configuration" | `DEEPLYNX_*` in `.env` (deck 03) |
+| `ModuleNotFoundError` in the container | `uv add <pkg>`; a `COPY` line for your own modules |
 | `No module named 'prometheus_api'` in `uv run pytest` | `uv pip install -e ~/prometheus/prometheus_core/sdk` |
 | test fails: no status update sent | keep a `send_status_update` in `_execute`, or drop that assertion |
 :::
@@ -168,7 +169,7 @@ docker restart client-agent
 cd ~/prometheus/hello-<you>
 git init -b main
 git status                     # NO .env in the list!
-git add . && git commit -m "Scaffold hello-world agent"
+git add . && git commit -m "Scaffold hello-world agent"   # uv.lock too
 gh repo create hello-<you> --public --source=. --push
 
 # 2 · fork a neighbour's repo (you = teammate)
@@ -178,11 +179,11 @@ cd hello-<neighbour>       # origin = yours, upstream = theirs
 git switch -c feature/better-greeting
 # edit agent_card.json: sharpen the skill description
 git commit -am "Describe when to call the greeting skill"
-git pull --rebase upstream main   # they merged first? replay
-git push -u origin HEAD        # later: git push --force-with-lease
+git pull --rebase upstream main   # before review only
+git push -u origin HEAD        # after review: git merge, no force
 gh pr create --repo <neighbour>/hello-<neighbour> \
   --base main --title "Describe the greeting skill" \
-  --body "Dry-run PR. Tested: uv run pytest."
+  --body "Reason, Design, Impact. Tested: uv run pytest."
 ```
 
 |||
@@ -194,7 +195,7 @@ gh pr create --repo <neighbour>/hello-<neighbour> \
 4. Swap roles with the PR you opened
 
 ::: callout warn
-Day 2 works the same way: one owner, teammates fork and open PRs, the owner reviews and merges. `--force-with-lease` only on your own feature branch.
+Day 2 works the same way: one owner, teammates fork and open PRs, the owner reviews and merges. Rebase only before review starts; afterwards merge `main` in, so review comments stay attached.
 :::
 
 {.xs .wrap-code}
@@ -203,7 +204,7 @@ Day 2 works the same way: one owner, teammates fork and open PRs, the owner revi
 | `gh: not logged in` / no github.com account | `gh auth login`; ask a mentor if you have no account |
 | `.env` shows up in `git status` | `echo .env >> .gitignore` before `git add` |
 | rebase conflict | edit → `git add` → `git rebase --continue` (or `--abort`) |
-| push rejected (non-fast-forward) | after a rebase: `git push --force-with-lease` |
+| push rejected (non-fast-forward) | before review: `git push --force-with-lease`; after: `git pull --no-rebase upstream main` |
 | no `gh` | `brew install gh`, or the release binary in `~/.local/bin`; or use the web UI (New repository, Fork, Compare & pull request) |
 ::::
 
@@ -227,9 +228,9 @@ git remote add upstream \
 git fetch upstream
 cd platform            # the stack lives here
 
-make init-env                   # .env with generated secrets
+make init-env                   # secrets; pick LLM profile + key
 echo "LOCAL_SDK=true" >> .env   # base image from ../sdk
-# set LLM_API_KEY (your profile's key) in .env
+# DEEPLYNX_* from your local DeepLynx (deck 03)
 
 make up                   # long first build; make logs to watch
 make ps
@@ -240,22 +241,22 @@ make ps
 ```bash {.xs}
 # 3. verify (bottom-up)
 set -a; source .env; set +a
-curl -s localhost:9977/health/liveliness
-curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-     localhost:9977/v1/agents | python3 -m json.tool
 curl -s localhost:8600/healthz
+curl -s localhost:8600/readyz
+curl -s -H "Authorization: Bearer $AGENT_SECRET" \
+     localhost:8600/v1/agents | python3 -m json.tool
 ```
 
 {.sm}
 1. Open `http://localhost:5150` → setup wizard → create the admin
-2. Admin › Signing Keys → **generate + activate**
-3. Chat: `/agents`, then ask a question
+2. Chat: `/agents`, then ask a question
 
 {.xs .wrap-code}
 | If… | then |
 |---|---|
 | `FROM …prometheus_api:` error or pull `unauthorized` | `LOCAL_SDK=true` missing in `.env` |
-| "No 'userToken' found" | activate a signing key |
+| "No 'userToken' found" | `ADMIN_DB_ENCRYPTION_KEY` in `.env`; `make logs SERVICE=backend` |
+| `LLM_CONFIG_PROFILE` missing / not supported | `make init-env` shows the menu again |
 | port already in use | `make down`, or change `*_PORT` in `.env` |
 :::
 
@@ -285,18 +286,16 @@ make ps
 
 # 3. verify (bottom-up)
 set -a; source .env; set +a
-curl -s localhost:9977/health/liveliness
-curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-     localhost:9977/v1/agents | python3 -m json.tool
 curl -s localhost:8600/healthz
+curl -s -H "Authorization: Bearer $AGENT_SECRET" \
+     localhost:8600/v1/agents | python3 -m json.tool
 ```
 
 |||
 
 1. Open `http://localhost:5150`; create the admin in the setup wizard if you haven't
-2. Admin › Signing Keys → **generate + activate**
-3. Chat: `/agents`, then ask a question
-4. Upload any small file: it should appear in DeepLynx
+2. Chat: `/agents`, then ask a question
+3. Upload any small file: it should appear in DeepLynx
 
 ::: callout warn
 Platform not up yet? Use the **bonus slide** at the end of this deck, and the bonus section of deck 03.

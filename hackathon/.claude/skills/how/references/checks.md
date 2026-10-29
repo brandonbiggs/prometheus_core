@@ -1,12 +1,12 @@
 # Checks
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, LiteLLM removed: the backend is the agent registry and A2A gateway). When the code disagrees with this file, the code is correct.
 
 Each check has a stable id; `/diagnose` runs them by tag or by symptom (`troubleshooting.md`).
 Fix kinds: **safe** (applied, then explained), **yes** (asked first), **you** (only you: a secret,
 a browser step, an install). Placeholders: `<root>`, `<platform>`, `<agent>`, `<container>`
 (`container_name:`), `<route-key>`, `<pin>` (`base-image-pin`), `<KEY>`. Default ports 5150,
-8600, 9977, 6379. Run bottom up: a low failure often causes the ones above it.
+8600, 6379 (local DeepLynx 3000, 5000). Run bottom up: a low failure often causes the ones above it.
 
 ## Secrets in these commands
 
@@ -24,69 +24,68 @@ Print only `PROMETHEUS_API_BASE_IMAGE_HASH`, `LLM_CONFIG_PROFILE`, `LLM_CONFIG_F
 
 | profile | key (`sdk/prometheus_api/llm_configs/*.yaml`; deck 03, A15) |
 |---|---|
-| `registry` (default) | none in the agent: it attaches `LITELLM_MASTER_KEY` (`llm-master-key-pattern`). The proxy uses the platform `LLM_API_KEY` (`platform/litellm_config.yaml:10`) |
+| (none) | required: no default. `registry` is rejected by `make init-env` (no LLM proxy on the platform) |
+| `ollama` | none (local aliases from `ollama cp <model> default|small|medium|large|vision`) |
 | every other profile | `LLM_API_KEY` (+ `EMBEDDING_API_KEY` for embeddings under `anthropic` / `anl_asksage`) |
 
-The template compose forwards `LLM_API_KEY` and `EMBEDDING_API_KEY`
-(`agent-template/agent_template/docker-compose.yml`).
+The template compose forwards `LLM_CONFIG_PROFILE` (`:?`, so compose stops when it is empty),
+`LLM_API_KEY` and `EMBEDDING_API_KEY` (`agent-template/agent_template/docker-compose.yml`).
 
 ## Laptop
 
 ### tools
-Tags: preflight. Fix: you. Run: `make --version | head -n 1; git --version; openssl version; python3 --version; uv --version` Expect five versions (Python 3.12 tested; deck 03, slide 14). Failure: `command not found` (`make up` needs `openssl`, `prometheus_platform/Makefile:275`). Fix: install it; uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+Tags: preflight. Fix: you. Run: `make --version | head -n 1; git --version; python3 --version; uv --version` Expect four versions (Python 3.12 tested; deck 03, bonus). Failure: `command not found` (`make up` runs `scripts/init_env.py` with `python3`). Fix: install it; uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`.
 ### repo-access
-Tags: preflight. Fix: you. Run: `gh auth status --hostname github.inl.gov; for r in prometheus_platform prometheus_agent_template hackathon; do GH_HOST=github.inl.gov gh repo view genesis/$r --json name -q .name; done` (no `gh`: `ssh -T git@github.inl.gov`, which prints "Hi <you>!" and exits 1) Expect "Logged in", then three names. Never add `--show-token`. Failure: "not logged in", "Could not resolve to a Repository", "Permission denied (publickey)". Fix: `gh auth login --hostname github.inl.gov` in your own terminal, or an SSH key; read access: a mentor adds you to the team `open` (deck 02, slide 17).
+Tags: preflight. Fix: you. Run: `gh auth status --hostname github.com; gh repo view idaholab/prometheus_core --json name -q .name` (no `gh`: `ssh -T git@github.com`, which prints "Hi <you>!" and exits 1) Expect "Logged in", then `prometheus_core`. Never add `--show-token`. Failure: "not logged in", "Could not resolve to a Repository", "Permission denied (publickey)". Fix: `gh auth login` in your own terminal, or an SSH key (deck 02, bonus).
 ### docker
 Tags: preflight, diagnose. Fix: you. Run: `docker info --format 'server {{.ServerVersion}}, memory {{.MemTotal}} bytes'; docker compose version --short` Expect a server version and Compose 2.20+ (`include:`, `additional_contexts`). Failure: "Cannot connect to the Docker daemon", old Compose, exit 137 (memory). Fix: start or update Docker Desktop, raise its memory. Podman is not supported.
 ### siblings
-Tags: preflight, diagnose. Fix: you. Run: `cd <root>/.. && ls -d prometheus_platform prometheus_agent_template && test -f prometheus_agent_template/setup_agent.py && test -f prometheus_platform/Makefile && echo ok` Expect both names and `ok`. `setup_agent.py` reads `../prometheus_platform/.env` (`setup_agent.py:21`). Fix: clone side by side (deck 02, slides 18-19).
+Tags: preflight, diagnose. Fix: you. Run: `cd <root>/.. && test -f prometheus_core/agent-template/setup_agent.py && test -f prometheus_core/platform/Makefile && echo ok` Expect `ok`. `setup_agent.py` reads `../platform/.env` inside the monorepo (`PLATFORM_ENV_PATH` in `setup_agent.py`). Fix: clone `prometheus_core` next to this repository (deck 02).
 ### personal-skills
 Tags: preflight. Fix: you. Run: `d="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"; for s in create-agent how diagnose; do test -e "$d/$s" && echo "$s"; done; echo done` Expect only `done`. A name above it is a personal skill that runs instead of the hackathon skill. Fix: rename it in your own terminal (`mv ~/.claude/skills/diagnose ~/.claude/skills/my-diagnose`), then start a new session.
 ### base-image-pin
-Tags: preflight, diagnose. Fix: yes. Run: `cd <platform> && grep -n '^PROMETHEUS_API_BASE_IMAGE_HASH' .env; sed -n 's/^PROMETHEUS_API_BASE_IMAGE_HASH[[:space:]]*?=[[:space:]]*//p' Makefile` `<pin>` is the `.env` value when set, else the Makefile `?=` value (`95c32b5`, `Makefile:22`; `environment.md`, "The pin rule"). Failure: an empty `PROMETHEUS_API_BASE_IMAGE_HASH=` line: "invalid reference format" (deck 03, slide 17). Fix: remove the line, then a platform `make up`.
+Tags: preflight, diagnose. Fix: yes. Run: `cd <platform> && grep -nE '^(LOCAL_SDK|PROMETHEUS_API_BASE_IMAGE_HASH)=' .env` Expect `LOCAL_SDK=true` (the base image `prometheus_api:local` is built from `../sdk`, `Makefile:19-31`); then `<pin>` is `local`. Without it the build pulls `containers.github.inl.gov/genesis/prometheus_api` (`registry-login`). Failure: an empty `PROMETHEUS_API_BASE_IMAGE_HASH=` line: "invalid reference format". Fix: `LOCAL_SDK=true` in `.env`, remove the empty line, then a platform `make up`.
 ### registry-login
-Tags: preflight, diagnose. Fix: you. Run: `docker pull -q containers.github.inl.gov/genesis/prometheus_api:<pin>` Expect the image reference. Failure: `unauthorized`/`denied` (no login, no `read:packages`, no org access); `manifest unknown` (bad pin); `dial tcp`/`no such host` (off the INL network or VPN). Fix, in your own terminal (paste the classic PAT at the first line; it never goes into the chat or a file; deck 03, slide 15):
+Tags: preflight, diagnose. Fix: you. Only without `LOCAL_SDK=true` (`base-image-pin`). Run: `docker pull -q containers.github.inl.gov/genesis/prometheus_api:<pin>` Expect the image reference. Failure: `unauthorized`/`denied` (no login, no `read:packages`, no org access); `manifest unknown` (bad pin); `dial tcp`/`no such host` (off the INL network or VPN). Fix, in your own terminal (paste the classic PAT at the first line; it never goes into the chat or a file; deck 03, slide 15):
   ```sh
   read -rs GITHUB_PAT
   echo "$GITHUB_PAT" | docker login containers.github.inl.gov --username <you> --password-stdin; unset GITHUB_PAT
   ```
 ### platform-env
-Tags: preflight, diagnose. Fix: yes. Run: `cd <platform> && test -f .env && for k in AGENT_SECRET REDIS_PASSWORD LITELLM_MASTER_KEY LITELLM_DB_PASSWORD ADMIN_DB_PASSWORD BACKEND_JWT_SECRET LITELLM_LOCAL_PORT; do printf '%s %s\n' "$k" "$(grep "^$k=" .env | tail -n 1 | grep -cvE "^$k=(\"\"|sk-ant-\.\.\.|sk-change-me|change-me.*|your-.*)?\$")"; done` Expect seven lines ending in `1`. Failure: no output (no `.env`, `Makefile:130`); `BACKEND_JWT_SECRET 0` stops the backend ("jwt_secret is not configured", `backend/app/main.py:39-41`). Fix: `cp .env.example .env`, then `environment.md` ("Fill the platform .env"), then `agent-env-sync`.
+Tags: preflight, diagnose. Fix: yes. Run: `cd <platform> && test -f .env && for k in AGENT_SECRET REDIS_PASSWORD ADMIN_DB_PASSWORD BACKEND_JWT_SECRET ADMIN_DB_ENCRYPTION_KEY LLM_CONFIG_PROFILE; do printf '%s %s\n' "$k" "$(grep "^$k=" .env | tail -n 1 | grep -cvE "^$k=(\"\"|sk-ant-\.\.\.|sk-change-me|change-me.*|your-.*)?\$")"; done` Expect six lines ending in `1`. `ADMIN_DB_ENCRYPTION_KEY 0`: no signing key is created (`signing-key`); `LLM_CONFIG_PROFILE 0` or `registry`: compose stops (`llm-key`). Failure: no output (no `.env`, `Makefile:130`); `BACKEND_JWT_SECRET 0` stops the backend ("jwt_secret is not configured", `backend/app/main.py:39-41`). Fix: `make init-env` (fills blank secrets, asks for the profile and key), then `agent-env-sync`.
 ### ports-free
-Tags: diagnose. Fix: yes. Run, with the platform stopped: `for p in 5150 8600 9977 6379; do printf '%s ' "$p"; lsof -nP -iTCP:"$p" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1; f=1} END {if (!f) print "free"}'; done` Expect `free` four times. Failure: a process (an old stack, a local Redis; macOS AirPlay holds 5000 for a local DeepLynx). Fix: `make down` in that stack, or change the `*_PORT` value. WSL: use `ss -ltn` (unverified).
+Tags: diagnose. Fix: yes. Run, with the platform stopped: `for p in 5150 8600 6379; do printf '%s ' "$p"; lsof -nP -iTCP:"$p" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1; f=1} END {if (!f) print "free"}'; done` Expect `free` three times. Failure: a process (an old stack, a local Redis; macOS AirPlay holds 5000 for a local DeepLynx). Fix: `make down` in that stack, or change the `*_PORT` value. WSL: use `ss -ltn` (unverified).
 ### platform-current
-Tags: diagnose. Fix: you. Run: `git -C <platform> log -1 --format='%h %cs %s'; git -C <platform> ls-files certs/INL.pem` Expect a recent commit and `certs/INL.pem`; without it, `npm ci` or `pip` gets SSL errors on the INL network. Fix: pull the latest `dev`, then a platform `make up`.
+Tags: diagnose. Fix: you. Run: `git -C <platform> log -1 --format='%h %cs %s'; git -C <platform> ls-files ../common/certs | head -n 3` Expect a recent commit and files under `common/certs/`; without them, `npm ci` or `pip` gets SSL errors on the INL network. Fix: pull the latest `devel`, then a platform `make up`.
 
 ## Stack
 
 ### stack-ps
-Tags: preflight, diagnose. Fix: yes. Run: `docker ps -a --filter label=com.docker.compose.project=prometheus_platform --format '{{.Names}}\t{{.Status}}'` Expect all `Up`; `litellm-db`, `admin-db`, `litellm-proxy`, `backend` also `(healthy)`. Containers: those four, `agent-valkey`, `client-agent`, `frontend-dev` (`frontend-prod` with `PROFILE=prod`), `form-filler-agent`, `osti-research-agent`, `synthesis-agent`; with `DEBUG_AGENTS=true` six debug agents. Failure: no lines (stopped); `Exited`/`Restarting` (`docker logs --tail 100 <name> 2>&1 | grep -iE 'error|exception|traceback|failed' | tail -n 20`); `(unhealthy)` (`backend-logs`). Fix: a platform `make up` (it empties the registry: stop your agent first).
+Tags: preflight, diagnose. Fix: yes. Run: `docker ps -a --filter label=com.docker.compose.project=prometheus_platform --format '{{.Names}}\t{{.Status}}'` Expect all `Up (healthy)` (`make up` waits for that, then runs `make check`). Containers: `admin-db`, `agent-valkey`, `backend`, `client-agent`, `frontend-dev` (`frontend-prod` with `PROFILE=prod`), `form-filler-agent`, `synthesis-agent`; `osti-research-agent` with `OPTIONAL_AGENTS=true`; the debug agents with `DEBUG_AGENTS=true`. No `litellm-*` container. Failure: no lines (stopped); `Exited`/`Restarting` (`docker logs --tail 100 <name> 2>&1 | grep -iE 'error|exception|traceback|failed' | tail -n 20`); `(unhealthy)` (`backend-logs`). Fix: a platform `make up` (it empties the registry: stop your agent first).
 
 ## Store
 
 ### store
-Tags: diagnose. Fix: yes. Run: `docker exec agent-valkey sh -c 'valkey-cli --no-auth-warning -a "$REDIS_PASSWORD" ping'; docker exec litellm-db pg_isready -U litellm; docker exec admin-db pg_isready -U admin` Expect `PONG` and "accepting connections" twice. Fix: `docker restart <name>`, or a platform `make restart`.
+Tags: diagnose. Fix: yes. Run: `docker exec agent-valkey sh -c 'valkey-cli --no-auth-warning -a "$REDIS_PASSWORD" ping'; docker exec admin-db pg_isready -U admin` Expect `PONG` and "accepting connections". Fix: `docker restart <name>`, or a platform `make restart`.
 
 ## Registry
 
-### litellm-health
-Tags: preflight, diagnose. Fix: yes. Run: `curl -s localhost:9977/health/liveliness` Expect `"I'm alive!"`. No output: stopped, or still starting (30 s healthcheck). Fix: wait, then read the `litellm-proxy` log.
+### platform-check
+Tags: preflight, diagnose. Fix: yes. Run: `cd <platform> && make check` Expect it to finish without an error: backend `/healthz`, the frontend, and every in-tree agent listed in `/v1/agents` (`scripts/check_platform.py`). It times out after `CHECK_TIMEOUT` (300 s). Failure names what is missing. Fix: the named check below.
 ### registry-auth
-Tags: preflight, diagnose. Fix: yes. Run: `set -a; source <platform>/.env; set +a; curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/models` Expect `200`. `401`: the key is empty, or the `.env` changed after LiteLLM started. Fix: correct it, then a platform `make restart`.
+Tags: preflight, diagnose. Fix: yes. Run: `set -a; source <platform>/.env; set +a; curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents` Expect `200`. `401`: wrong `AGENT_SECRET`; `503`: the backend has no `AGENT_SECRET` (`backend/app/routers/agent_registry.py:65-75`). Fix: correct the `.env`, then a platform `make restart`.
 ### registry-agents
-Tags: preflight, diagnose. Fix: safe. Run: `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/agents | python3 -c 'import json,sys; print(sorted(a["agent_name"] for a in json.load(sys.stdin)))'` Never use `python3 -m json.tool` here: `static_headers` hold `AGENT_SECRET`. Expect `form-filler-agent`, `nuclear-analysis-client-agent`, `osti-research-agent`, `synthesis-agent` (with `DEBUG_AGENTS=true` also `artifact-debug-agent`, `corrosion-analysis-agent`, `material-data-agent`, `radiation-damage-analysis-agent`, `thermal-analysis-agent`, `thread-pattern-debug-agent`), and `<route-key>`. Failure: a `TypeError` (`registry-auth`); your key missing (`agent-running`, `agent-registered-log`). Fix: `docker restart <container>`.
+Tags: preflight, diagnose. Fix: safe. Run: `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents | python3 -c 'import json,sys; print(sorted(a["agent_name"] for a in json.load(sys.stdin)))'` (the backend never returns `static_headers`). Expect `form-filler-agent`, `nuclear-analysis-client-agent`, `synthesis-agent` (with `OPTIONAL_AGENTS=true` also `osti-research-agent`; with `DEBUG_AGENTS=true` the debug agents), and `<route-key>`. Failure: a `TypeError` (`registry-auth`); your key missing (`agent-running`, `agent-registered-log`). Fix: `docker restart <container>`.
 ### registry-details
 Tags: diagnose. Fix: yes.
 ```sh
-set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/agents | python3 -c 'import json,sys
+set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $AGENT_SECRET" localhost:8600/v1/agents | python3 -c 'import json,sys
 for a in json.load(sys.stdin): c = a.get("agent_card_params") or {}; print(a["agent_name"], c.get("url"), [s.get("id") for s in c.get("skills", [])])'
 python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); print(c["name"].lower().replace(" ", "-"), [s["id"] for s in c["skills"]])' <agent>/agent_card.json
 ```
 - Expect your route key once, and none of your skill ids in another list. The same key deletes the other entry (`prometheus_api/prometheus_api/agent/registry.py:123-130`); the same skill id goes to the first tool (`client-agent/orchestrator/skills.py:16-19`). Fix: rename (`/create-agent improve my card`), then `make up` in the agent folder.
-### llm-models
-Tags: preflight, diagnose. Fix: yes. Run: `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/models | python3 -c 'import json,sys; print(sorted(m["id"] for m in json.load(sys.stdin)["data"]))'` Expect `['medium']` at least: the proxy defines only `medium` (`litellm_config.yaml:6-10`). A missing flavor: `llm-flavors`. Never edit `litellm_config.yaml`.
 ### llm-call
-Tags: preflight, diagnose. Fix: you. Profile `registry` only (else ask one chat question). Run: `set -a; source <platform>/.env; set +a; curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H 'Content-Type: application/json' localhost:9977/v1/chat/completions -d '{"model":"medium","messages":[{"role":"user","content":"ping"}],"max_tokens":5}'` Expect `200`. `401` with `registry-auth` at `200`: the platform `LLM_API_KEY` is wrong. Fix: a working key in the `.env` (your editor), then a platform `make restart`; no key: the LLM mentor (`mentors.md`).
+Tags: preflight, diagnose. Fix: you. There is no LLM proxy to curl: agents call the provider directly. Ask one chat question, then read the agent or client-agent log for `LLMProviderError` (status code and one-line reason), `LLMEndpointUnavailableError` (endpoint unreachable), or `LLMConfigError` (profile). Fix: `llm-key`, `llm-key-in-agent-env`; no key: the LLM mentor (`mentors.md`).
 
 ## Backend
 
@@ -99,16 +98,16 @@ Tags: preflight, diagnose. Fix: yes. Run: `curl -s -o /dev/null -w '%{http_code}
 ### admin-user
 Tags: preflight, diagnose. Fix: you. Run: `curl -s localhost:8600/api/setup/status` Expect `{"needs_setup":false}`. `true`: open http://localhost:5150 and complete the wizard; the first user is admin.
 ### signing-key
-Tags: preflight, diagnose. Fix: you. Run: `docker exec admin-db psql -U admin -d admin -tAc "SELECT count(*) FROM signing_keys WHERE is_active"` Expect `1`. `0`: every turn fails with "No 'userToken' found in message metadata and USER_IDENTITY_REQUIRED=true" (`prometheus_api/prometheus_api/agent/base.py:403-406`); `USER_IDENTITY_PRIVATE_KEY` alone does not help (the JWKS lists only `admin-db` keys). Fix: Admin › Signing Keys → generate, then activate (deck 03, slide 5). Local only, after a yes: `USER_IDENTITY_REQUIRED=false` in both `.env` files, then a platform `make restart`.
+Tags: preflight, diagnose. Fix: yes. Run: `docker exec admin-db psql -U admin -d admin -tAc "SELECT count(*) FROM signing_keys WHERE is_active"` Expect `1`. `0`: every turn fails with "No 'userToken' found in message metadata and USER_IDENTITY_REQUIRED=true" (`prometheus_api/prometheus_api/agent/base.py:403-406`); The backend creates and activates one on first start (`backend/app/signing_keys.py`), unless `USER_IDENTITY_PRIVATE_KEY` is set or `ADMIN_DB_ENCRYPTION_KEY` is missing or invalid (it then logs a warning: `backend-logs`). Fix: a valid `ADMIN_DB_ENCRYPTION_KEY` (`make init-env` generates one), no `USER_IDENTITY_PRIVATE_KEY`, then a platform `make restart`. Local only, after a yes: `USER_IDENTITY_REQUIRED=false` in both `.env` files, then a platform `make restart`.
 ### identity-required-match
 Tags: preflight, diagnose. Fix: yes. Run: `grep '^USER_IDENTITY_REQUIRED=' <platform>/.env <agent>/.env` Expect the same value, or `true` (default) and no agent line. `false` only in the platform: the agent rejects each call with "No 'userToken' found…" (`client-agent/tool_discovery.py:445-454`). Fix: add the line to the agent `.env`, then `make up` in the agent folder.
 ### llm-key
-Tags: preflight, diagnose. Fix: you. Run: `grep -E '^LLM_CONFIG_(PROFILE|FILE)=' <platform>/.env`, then the key test for the profile's key ("LLM profile → key"). Expect `1`. A set `LLM_CONFIG_FILE` wins: read its `api_key` names. Fix: add the key in your editor, then a platform `make restart`.
+Tags: preflight, diagnose. Fix: you. Run: `grep -E '^LLM_CONFIG_(PROFILE|FILE)=' <platform>/.env`, then the key test for the profile's key ("LLM profile → key"). Expect a profile (not empty, not `registry`) and `1`. A set `LLM_CONFIG_FILE` wins: read its `api_key` names. Fix: blank the profile and run `make init-env` for the menu, or set both in your editor; then a platform `make restart`.
 
 ## DeepLynx
 
 ### deeplynx-env
-Tags: preflight, diagnose. Fix: yes. Optional on Day 1; uploads and PNGs need it (deck 03, slide 9). Run: `for k in DEEPLYNX_KEY DEEPLYNX_SECRET DEEPLYNX_ORG_ID DEEPLYNX_PROJECT_ID; do printf '%s %s\n' "$k" "$(grep "^$k=" <platform>/.env | tail -n 1 | grep -cvE "^$k=(\"\"|your-.*|change-me.*)?\$")"; done; grep '^DEEPLYNX_BASE_URL=' <platform>/.env | tail -n 1` Expect four `1` lines (no URL line: `https://deeplynx.inl.gov/api/v1`). Failure: "…but DeepLynx storage is not configured." (`client-agent/orchestrator/service.py:461`); "invalid literal for int() with base 10: ''" (empty org or project id). Fix: a shared key or `artifacts.md` ("Local DeepLynx"), a platform `make restart`, `agent-env-sync`.
+Tags: preflight, diagnose. Fix: yes. **Required**: every agent writes an execution record and exits at startup without it (deck 03, Local DeepLynx 1-3). Run: `for k in DEEPLYNX_KEY DEEPLYNX_SECRET DEEPLYNX_ORG_ID DEEPLYNX_PROJECT_ID; do printf '%s %s\n' "$k" "$(grep "^$k=" <platform>/.env | tail -n 1 | grep -cvE "^$k=(\"\"|your-.*|change-me.*)?\$")"; done; grep '^DEEPLYNX_BASE_URL=' <platform>/.env | tail -n 1` Expect four `1` lines (or `DEEPLYNX_JWT_TOKEN` instead of key + secret, never both) and the local URL `http://prometheus.host.internal:5000/api/v1/`. Failure: "Invalid required DeepLynx configuration: …" in an agent log (`sdk/prometheus_api/agent/base.py`, `_validate_deeplynx_configuration`); "…but DeepLynx storage is not configured." on uploads. Fix: `artifacts.md` ("Local DeepLynx"), a platform `make restart`, `agent-env-sync`.
 ### deeplynx-backend
 Tags: preflight, diagnose. Fix: you.
 ```sh
@@ -119,45 +118,47 @@ with StorageClient(cfg) as c:
     print("OK", cfg.base_url, len(c.items.list(page_size=5).items), "items")
 EOF
 ```
-- Expect `OK <base URL> <n> items`. Failure: `AuthenticationError`/401 (key and secret swapped or cut); connection refused to `prometheus.host.internal` (local DeepLynx stopped; host firewall; AirPlay on :5000); `ValueError` (empty ids).
+- Expect `OK <base URL> <n> items`. Failure: `AuthenticationError`/401 (key and secret swapped or cut); connection refused to `prometheus.host.internal` (local DeepLynx stopped; host firewall; AirPlay on :5000); "Invalid required DeepLynx configuration: missing …" (empty ids).
 ### deeplynx-agent
 Tags: diagnose. Fix: yes. Run the `deeplynx-backend` command with `docker exec -i <container>`. Expect `OK` and the same base URL; a `deeplynx://` URI resolves only with the same org and project. Fix: `agent-env-sync`.
 
 ## Your agent
 
 ### agent-running
-Tags: diagnose. Fix: safe. Run: `docker ps -a --filter "name=^<container>$" --format '{{.Names}}\t{{.Status}}'` Expect `Up`. No line or `Exited`/`Restarting`: `agent-logs`. Fix: `make up` in the agent folder.
+Tags: diagnose. Fix: safe. Run: `docker ps -a --filter "name=^<container>$" --format '{{.Names}}\t{{.Status}}'` Expect `Up`. No line or `Exited`/`Restarting`: `agent-logs` (often DeepLynx or `LLM_CONFIG_PROFILE`). Fix: `make up` in the agent folder.
 ### agent-registered-log
-Tags: diagnose. Fix: safe. Run: `docker logs <container> 2>&1 | grep -E "Registered '|Registry registration attempt|Failed to register|Continuing without registration" | tail -n 5` Expect `Registered '<route-key>' with LiteLLM at http://litellm-proxy:4000` within 30 s (11 attempts, backoff 2 s to 30 s, `registry.py:200-233`). Failure: "attempt n/11 failed: …401" (`agent-env-sync`); a connection error (LiteLLM down, wrong network mode); "Continuing without registration". `Registered` but not in `registry-agents`: the platform restarted. Fix: the cause, then `docker restart <container>`.
+Tags: diagnose. Fix: safe. Run: `docker logs <container> 2>&1 | grep -E "Registered '|Registry registration attempt|Failed to register|Continuing without registration" | tail -n 5` Expect `Registered '<route-key>' with LiteLLM at http://backend:8000` within 30 s (the SDK's log wording is old; the URL is the backend). An agent still logging `litellm` in the URL was scaffolded before the template fix: set `REGISTRY_URL=http://backend:8000` and `LITELLM_MASTER_KEY: ${AGENT_SECRET}` in its compose. Failure: "attempt n/11 failed: …401" (`agent-env-sync`); a connection error (backend down, wrong network mode); "Continuing without registration". `Registered` but not in `registry-agents`: the platform restarted. Fix: the cause, then `docker restart <container>`.
 ### agent-logs
-Tags: diagnose. Fix: yes. Run: `docker logs --tail 200 <container> 2>&1 | grep -E 'Traceback|Error|Identity verification failed|ModuleNotFoundError|401' | tail -n 20`; traceback: `... | grep -A 25 'Traceback' | tail -n 60` The SDK logs only parameter keys (`base.py:479`); your code can log values: read before you quote. `ModuleNotFoundError` → `dockerfile-copy`; "AGENT_SECRET_REQUIRED=true but AGENT_SECRET is not set" → `agent-env-sync`; "Identity verification failed" → `signing-key`, `identity-required-match`, `agent-env-sync`; `LLMAliasError` → `llm-flavors`; LLM 401 → `llm-master-key-pattern`; "Error during execution" (`base.py:282`) → your code, `/diagnose trace my last chat`.
+Tags: diagnose. Fix: yes. Run: `docker logs --tail 200 <container> 2>&1 | grep -E 'Traceback|Error|Identity verification failed|ModuleNotFoundError|401' | tail -n 20`; traceback: `... | grep -A 25 'Traceback' | tail -n 60` The SDK logs only parameter keys (`base.py:479`); your code can log values: read before you quote. "Invalid required DeepLynx configuration" → `deeplynx-env`, `agent-env-sync`; `ModuleNotFoundError` → `dockerfile-copy`; "AGENT_SECRET_REQUIRED=true but AGENT_SECRET is not set" → `agent-env-sync`; "Identity verification failed" → `signing-key`, `identity-required-match`, `agent-env-sync`; `LLMAliasError` → `llm-flavors`; `LLMConfigError` → `llm-profile-valid`; `LLMProviderError` 401/403 → `llm-key-in-agent-env`; "Error during execution" (`base.py:282`) → your code, `/diagnose trace my last chat`.
 ### agent-env-sync
-Tags: preflight, diagnose. Fix: yes. The keys that `setup_agent.py` copies (`setup_agent.py:22-36`); a copy goes stale when the platform `.env` changes.
+Tags: preflight, diagnose. Fix: yes. The keys that `setup_agent.py` copies (`setup_agent.py:48-66`); a copy goes stale when the platform `.env` changes.
 ```sh
-P=<platform>/.env; A=<agent>/.env; for k in AGENT_SECRET REDIS_PASSWORD LITELLM_MASTER_KEY USER_IDENTITY_PUBLIC_KEY USER_IDENTITY_ISS USER_IDENTITY_AUD LLM_CONFIG_PROFILE $(grep -o '^DEEPLYNX_[A-Z_]*' "$P" | sort -u); do cmp -s <(grep "^$k=." "$P" | tail -n 1) <(grep "^$k=." "$A" | tail -n 1) && echo "$k same" || echo "$k differs"; done
+P=<platform>/.env; A=<agent>/.env; for k in AGENT_SECRET REDIS_PASSWORD LLM_API_KEY USER_IDENTITY_PUBLIC_KEY USER_IDENTITY_ISS USER_IDENTITY_AUD LLM_CONFIG_PROFILE $(grep -o '^DEEPLYNX_[A-Z_]*' "$P" | sort -u); do cmp -s <(grep "^$k=." "$P" | tail -n 1) <(grep "^$k=." "$A" | tail -n 1) && echo "$k same" || echo "$k differs"; done
 ```
-- Expect `same` (`LLM_CONFIG_PROFILE differs` is fine by choice). `LITELLM_MASTER_KEY` → 401s; `REDIS_PASSWORD` → Valkey errors; `USER_IDENTITY_*` → issuer or audience mismatch; `DEEPLYNX_*` → URIs that do not resolve. Fix: copy the differing lines without printing them, then `make up` in the agent folder:
+- Expect `same` (`LLM_CONFIG_PROFILE differs` is fine by choice). `AGENT_SECRET` → registration 401s; `LLM_API_KEY` → `LLMProviderError`; `REDIS_PASSWORD` → Valkey errors; `USER_IDENTITY_*` → issuer or audience mismatch; `DEEPLYNX_*` → URIs that do not resolve. Fix: copy the differing lines without printing them, then `make up` in the agent folder:
   ```sh
   P=<platform>/.env; A=<agent>/.env; for k in <KEY> <KEY>; do grep -v "^$k=" "$A" > "$A.tmp" && grep "^$k=" "$P" | tail -n 1 >> "$A.tmp" && mv "$A.tmp" "$A"; done
   ```
 ### agent-base-image
-Tags: preflight, diagnose. Fix: yes. Run: `grep '^PROMETHEUS_API_BASE_IMAGE_HASH=' <agent>/.env | tail -n 1` Expect `<pin>`. None: the agent builds from `latest` (`agent_template/docker-compose.yml:8`). Fix: add the pin, then `make up` in the agent folder.
-### llm-master-key-pattern
-Tags: preflight, diagnose. Fix: yes (code). LLM 401, cause 1. Run: `grep '^LLM_CONFIG_PROFILE=' <agent>/.env | tail -n 1; grep -rnE 'llm_client\(|LLMClient\(|with_api_key|proxy_url' --include='*.py' --exclude-dir=.venv <agent>` Expect, under `registry`: `cfg = LLMConfig.from_env()`, `if cfg.proxy_url: cfg = cfg.with_api_key(os.getenv("LITELLM_MASTER_KEY"))`, `async with self.llm_client(context, config=cfg) as llm:` (deck 04, A31). A plain `self.llm_client(context)` gets 401. Fix: `llm.md`, then `make up`.
+Tags: preflight, diagnose. Fix: yes. Run: `grep -E '^(LOCAL_SDK|PROMETHEUS_API_BASE_IMAGE_HASH)=' <agent>/.env | tail -n 2` Expect `LOCAL_SDK=true` when the platform has it (`setup_agent.py` copies it). None: the agent pulls `latest` from `containers.github.inl.gov`. Fix: add the line, then `make up` in the agent folder.
+### agent-lockfile
+Tags: preflight, diagnose. Fix: yes. Run: `cd <agent> && git ls-files --error-unmatch uv.lock >/dev/null && uv lock --check && echo ok` Expect `ok`. Failure: the build stops with "ERROR: uv.lock not found…", or `uv sync --locked` fails (stale lock). Fix: `uv sync` (or `uv add <pkg>`), then commit `pyproject.toml` with `uv.lock` and `make up`.
+### llm-client-pattern
+Tags: preflight, diagnose. Fix: yes (code). Run: `grep -rnE 'llm_client\(|LLMClient\(|with_api_key|proxy_url|LITELLM_MASTER_KEY' --include='*.py' --exclude-dir=.venv <agent>` Expect `async with self.llm_client(context) as llm:` and no `with_api_key`/`LITELLM_MASTER_KEY` swap (the old `registry` pattern; deck 04). Fix: `llm.md`, then `make up`.
 ### llm-key-in-agent-env
-Tags: preflight, diagnose. Fix: yes. LLM 401, cause 2. Run the key test on `<agent>/.env` for the profile's key. Expect `1`. Fix: copy it with the `agent-env-sync` fix, or add it in your editor; then `make up`.
+Tags: preflight, diagnose. Fix: yes. LLM 401, cause 1. Run the key test on `<agent>/.env` for the profile's key. Expect `1`. Fix: copy it with the `agent-env-sync` fix, or add it in your editor; then `make up`.
 ### llm-key-in-container
-Tags: preflight, diagnose. Fix: yes. LLM 401, cause 3. Run: `grep -cE '^[[:space:]]+<KEY>:' <agent>/docker-compose.yml; docker exec <container> sh -c 'case "${<KEY>:-}" in ""|"sk-ant-..."|change-me*|sk-change-me*) echo missing ;; *) echo set ;; esac'` Expect `1`, `set`. `0`: `environment:` does not forward it (an agent scaffolded before `LLM_API_KEY`). `missing`: the `.env` lacks it, or the container is older. Fix: add `      <KEY>: ${<KEY>:-}` under `environment:`, then `make up`.
+Tags: preflight, diagnose. Fix: yes. LLM 401, cause 2. Run: `grep -cE '^[[:space:]]+<KEY>:' <agent>/docker-compose.yml; docker exec <container> sh -c 'case "${<KEY>:-}" in ""|"sk-ant-..."|change-me*|sk-change-me*) echo missing ;; *) echo set ;; esac'` Expect `1`, `set`. `0`: `environment:` does not forward it (an agent scaffolded before `LLM_API_KEY`). `missing`: the `.env` lacks it, or the container is older. Fix: add `      <KEY>: ${<KEY>:-}` under `environment:`, then `make up`.
 ### llm-flavors
-Tags: diagnose. Fix: yes (code). Run: `grep -rnoE '\.(small|medium|large|vision|embed|embedding)\(|model="[a-z_]+"' --include='*.py' --exclude-dir=.venv <agent>` Compare with `llm-models`. Failure: `LLMAliasError: LLM alias 'small' is not available. Available aliases: medium.` (`llm_client/client.py:36-41`). Fix: `medium` under `registry`, an own `LLM_CONFIG_FILE`, or another profile (`llm.md`).
+Tags: diagnose. Fix: yes (code). Run: `grep -rnoE '\.(small|medium|large|vision|embed|embedding)\(|model="[a-z_]+"' --include='*.py' --exclude-dir=.venv <agent>` Compare with the profile YAML (`sdk/prometheus_api/llm_configs/<profile>.yaml`, `model_name:`). Failure: `LLMAliasError: LLM alias 'small' is not available. …` Fix: a defined flavor, an own `LLM_CONFIG_FILE`, or another profile (`llm.md`).
 ### llm-profile-valid
-Tags: diagnose. Fix: yes. Run: `docker run --rm containers.github.inl.gov/genesis/prometheus_api:<pin> python -c "from prometheus_api.llm_configs import LLM_CONFIG_PROFILES as p; print(p)"` Expect the agent's profile in the list (95c32b5: `registry`, `inl_hpc`, `inl_litellm`, `amsc`, `anthropic`, `openai`). Failure: "Unknown LLM config profile". Fix: correct the name, then `make up`.
+Tags: diagnose. Fix: yes. Run: `docker exec <container> python -c "from prometheus_api.llm_configs import list_llm_config_profiles as p; print(p())"` Expect the agent's profile in the list (`amsc`, `anl_asksage`, `anthropic`, `genesis`, `inl_hpc`, `inl_litellm`, `ollama`, `openai`; `registry` is listed but rejected on the platform). Failure: `LLMConfigError: Invalid LLM_CONFIG_PROFILE: …` (lists the installed ones). Fix: correct the name, then `make up`.
 ### dockerfile-copy
-Tags: diagnose. Fix: yes. Run: `cd <agent> && ls *.py; grep -n '^COPY' Dockerfile; docker exec <container> ls /app` Expect a `COPY` line per own module; the template copies only `pyproject.toml`, `agent.py`, `agent_card.json`, `prompts/`, `workflows/` (`agent_template/Dockerfile:34-37`). `ModuleNotFoundError: No module named 'x'`: add `COPY x.py /app/x.py`, or the PyPI package to `pyproject.toml` (never `prometheus_api`); then `make up`.
+Tags: diagnose. Fix: yes. Run: `cd <agent> && ls *.py; grep -n '^COPY' Dockerfile; docker exec <container> ls /app` Expect a `COPY` line per own module; the template copies only `pyproject.toml`, `agent.py`, `agent_card.json`, `prompts/`, `workflows/` (`agent_template/Dockerfile:34-37`). `ModuleNotFoundError: No module named 'x'`: add `COPY x.py /app/x.py`, or `uv add <package>` (never `prometheus_api`) and commit `uv.lock`; then `make up`.
 ### card-in-image
 Tags: diagnose. Fix: safe. Run: `for f in agent_card.json agent.py; do docker exec <container> cat /app/$f | cmp -s - <agent>/$f && echo "$f same" || echo "$f differs"; done` Expect `same` twice. `differs`: an old image (`docker restart` keeps it). Fix: `make up` in the agent folder, then `discovery-refresh`.
 ### client-agent-reaches-agent
-Tags: diagnose. Fix: yes. Run: `docker exec client-agent python -c "import urllib.request as u; print(u.urlopen('<url>/healthz', timeout=5).read())"` (`<url>` from `registry-details`) Expect `b'{"ok":true,...}'`. A connection error: the LiteLLM card has no `inputSchema` (`tool_discovery.py:118-143`). Fix: the internal network mode (no `EXTERNAL_AGENT_*` lines), then `make up` (`run-and-register.md`).
+Tags: diagnose. Fix: yes. Run: `docker exec client-agent python -c "import urllib.request as u; print(u.urlopen('<url>/healthz', timeout=5).read())"` (`<url>` from `registry-details`) Expect `b'{"ok":true,...}'`. A connection error: the client-agent falls back to the registry copy of the card (`tool_discovery.py:133-145`), but cannot call the agent. Fix: the internal network mode (no `EXTERNAL_AGENT_*` lines), then `make up` (`run-and-register.md`).
 
 ## Discovery
 

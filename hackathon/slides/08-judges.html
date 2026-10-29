@@ -98,7 +98,7 @@
 <tr>
 <td>3</td>
 <td>Registers with the platform; appears under <code>/agents</code></td>
-<td><code>curl -H &quot;Authorization: Bearer $LITELLM_MASTER_KEY&quot; localhost:9977/v1/agents</code>, then <code>/agents</code> in the chat</td>
+<td><code>curl -H &quot;Authorization: Bearer $AGENT_SECRET&quot; localhost:8600/v1/agents</code>, then <code>/agents</code> in the chat</td>
 </tr>
 <tr>
 <td>4</td>
@@ -113,7 +113,7 @@
 <tr>
 <td>6</td>
 <td>Tests pass and lint is clean</td>
-<td>Fresh clone of the SHA: <code>uv sync</code>, the SDK (below), <code>uv run pytest &amp;&amp; uv run ruff check .</code></td>
+<td>Fresh clone of the SHA: <code>uv lock --check</code>, <code>uv sync</code>, the SDK (below), <code>uv run pytest &amp;&amp; uv run ruff check .</code> (the template's tests include <code>test_build_app_loads_agent_card</code>)</td>
 </tr>
 <tr>
 <td>7</td>
