@@ -419,7 +419,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Typecheck
         if: ${{ !cancelled() }}
-        run: uv run --frozen mypy setup_agent.py
+        run: uv run --frozen mypy .
 
   agent-template-scaffold:
     name: "agent-template: scaffold python ${{ matrix.python }}"
