@@ -22,14 +22,21 @@ WORKDIR /app
 ENV UV_PROJECT_ENVIRONMENT="/usr/local" \
     UV_LINK_MODE=copy
 
-# Copy the dependency manifest first so Docker can cache this layer.
-# If pyproject.toml hasn't changed, the next RUN is skipped on rebuild.
-COPY pyproject.toml /app/
+# Copy the dependency manifest and lockfile first so Docker can cache this
+# layer. If neither has changed, the next RUN is skipped on rebuild. The
+# uv.lock* glob still matches if you haven't run uv sync yet to create it.
+COPY pyproject.toml uv.lock* /app/
 
 # Install your agent's extra dependencies (not prometheus_api itself — it's in
-# the base image).  The cache mount speeds up repeated builds on the same host.
+# the base image), at the versions in uv.lock. --locked fails if uv.lock is
+# out of date with pyproject.toml; without a uv.lock, the versions are
+# resolved fresh. The cache mount speeds up repeated builds on the same host.
 RUN --mount=type=cache,id=prometheus-uv-cache,target=/root/.cache/uv,sharing=locked \
-    uv sync --no-dev --no-install-project --inexact
+    if [ -f uv.lock ]; then \
+        uv sync --locked --no-dev --no-install-project --inexact; \
+    else \
+        uv sync --no-dev --no-install-project --inexact; \
+    fi
 
 # Copy agent source last so code changes don't invalidate the dependency cache.
 COPY agent.py /app/agent.py

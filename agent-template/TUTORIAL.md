@@ -606,10 +606,10 @@ ENV UV_PROJECT_ENVIRONMENT="/usr/local" \
 Configures uv to install packages into the system Python (where `prometheus_api` is already installed) rather than a separate virtual environment.
 
 ```dockerfile
-COPY pyproject.toml /app/
-RUN --mount=type=cache,...  uv sync --no-dev --no-install-project --inexact
+COPY pyproject.toml uv.lock* /app/
+RUN --mount=type=cache,...  uv sync --locked --no-dev --no-install-project --inexact
 ```
-Copies the dependency manifest and installs your packages. This layer is cached by Docker: if `pyproject.toml` hasn't changed since the last build, Docker skips the `RUN` line entirely — making subsequent rebuilds very fast.
+Copies the dependency manifest and lockfile and installs your packages at the versions in `uv.lock`. The build fails if `uv.lock` is out of date with `pyproject.toml`. This layer is cached by Docker: if neither file has changed since the last build, Docker skips the `RUN` line entirely — making subsequent rebuilds very fast.
 
 ```dockerfile
 COPY agent.py /app/agent.py
