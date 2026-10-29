@@ -25,21 +25,11 @@ version; don't use features from newer releases until the minimum is raised.
 
 Formatting isn't a review topic. The formatters decide, and CI enforces them.
 
-| Component | Tools | Line length | Rules |
-|-----------|-------|-------------|-------|
-| `sdk/` | ruff, mypy | 100 | ruff defaults |
-| `agent-template/` | ruff, mypy | 120 | `E F W I UP B SIM` |
-| `platform/backend/` | ruff, mypy | 120, not enforced | `E F` |
-| `platform/tests/`, `platform/scripts/` | ruff | 120, not enforced | `E F` |
-| `platform/agents/` | none in CI | n/a | see [Open questions](#open-questions) |
-| `platform/frontend/` | ESLint, `tsc` | n/a | zero warnings allowed (`--max-warnings 0`) |
-
-The platform rules live in `platform/ruff.toml`, and each Python component's
-rules are in its `pyproject.toml`. The backend sets `max-complexity = 10`, but
-the complexity rule (`C90`) isn't selected, so the limit isn't enforced. Each
-component pins its own ruff version in
-its lockfile, so run ruff through `uv run` or `make` rather than a global
-install.
+Python code is linted and formatted with ruff. A file's rules are in the
+closest `pyproject.toml` above it, which may extend `platform/ruff.toml`. Each
+component pins its own ruff version in its lockfile, so run ruff through
+`uv run` or `make` rather than a global install. The frontend uses ESLint and
+`tsc`, with zero warnings allowed.
 
 ### Naming
 
@@ -203,13 +193,10 @@ These need a team decision. Each one would be its own pull request.
    between components. Proposal: adopt agent-template's rule set
    (`E F W I UP B SIM`) everywhere, at 120 characters, fixing each component in
    its own PR.
-2. **Lint `platform/agents/` in CI.** No agent is ruff-checked today.
-3. **Test every agent in CI.** Five of the eleven agents under
-   `platform/agents/` run their tests in CI.
-4. **Run mypy on the SDK in CI,** not only in the pre-push hook.
-5. **Enforce the backend's complexity limit** by selecting ruff's `C90` rule,
+2. **Run mypy on the SDK in CI,** not only in the pre-push hook.
+3. **Enforce the backend's complexity limit** by selecting ruff's `C90` rule,
    which `max-complexity = 10` already assumes.
-6. **Docstrings:** enforce them (for example with ruff's `D` rules) or keep them
+4. **Docstrings:** enforce them (for example with ruff's `D` rules) or keep them
    a review guideline?
-7. **Automated dependency updates:** add Dependabot or Renovate, at least for
+5. **Automated dependency updates:** add Dependabot or Renovate, at least for
    GitHub Actions and base images?
