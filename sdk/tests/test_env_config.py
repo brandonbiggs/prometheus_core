@@ -131,3 +131,35 @@ DEEPLYNX_DATA_SOURCE_ID=789
     config = ConnectionConfig.from_env(env_file=test_env)
 
     assert config.data_source_id == 789
+
+
+def test_from_env_blank_data_source_id_is_unset(tmp_path, monkeypatch):
+    """A blank DEEPLYNX_DATA_SOURCE_ID (compose ``${VAR:-}``) means unset."""
+    monkeypatch.setenv("DEEPLYNX_DATA_SOURCE_ID", "")
+    test_env = tmp_path / ".env.test"
+    test_env.write_text("""
+DEEPLYNX_KEY=key
+DEEPLYNX_SECRET=secret
+DEEPLYNX_ORG_ID=123
+DEEPLYNX_PROJECT_ID=456
+DEEPLYNX_DATA_SOURCE_ID=
+""")
+
+    config = ConnectionConfig.from_env(env_file=test_env)
+
+    assert config.data_source_id is None
+
+
+def test_from_env_blank_org_id_raises_missing(tmp_path, monkeypatch):
+    """A blank DEEPLYNX_ORG_ID reports the missing variable, not int('')."""
+    monkeypatch.setenv("DEEPLYNX_ORG_ID", "")
+    test_env = tmp_path / ".env.test"
+    test_env.write_text("""
+DEEPLYNX_KEY=key
+DEEPLYNX_SECRET=secret
+DEEPLYNX_ORG_ID=
+DEEPLYNX_PROJECT_ID=456
+""")
+
+    with pytest.raises(ValueError, match="DEEPLYNX_ORG_ID"):
+        ConnectionConfig.from_env(env_file=test_env)
