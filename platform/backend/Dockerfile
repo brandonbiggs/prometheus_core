@@ -37,13 +37,13 @@ RUN --mount=type=bind,from=sdk,source=pyproject.toml,target=/src/pyproject.toml 
 
 WORKDIR /app
 
-# `prometheus-api` is a dev-only dependency in pyproject.toml, pinned to a private
-# git branch via [tool.uv.sources] for local tests. It is already installed above,
-# and at image build time we must NOT fetch that private repo, so:
+# `prometheus-api` is a dev-only dependency in pyproject.toml, sourced from
+# ../../sdk via [tool.uv.sources] for local tests. It is already installed above,
+# and that path isn't in this build context, so:
 #   --no-dev       exclude the dev group (we don't reinstall prometheus-api)
-#   --no-sources   ignore [tool.uv.sources] entirely, so uv never clones the git
-#                  repo while resolving the lock (the deciding flag — --no-dev alone
-#                  still resolves the source)
+#   --no-sources   ignore [tool.uv.sources] entirely, so uv never looks for the
+#                  path while resolving (the deciding flag — --no-dev alone still
+#                  resolves the source)
 #   --inexact      keep the prometheus-api + deps installed above
 #   --no-install-project  don't install backend itself; the code is COPYed below
 ENV UV_PROJECT_ENVIRONMENT="/usr/local" \

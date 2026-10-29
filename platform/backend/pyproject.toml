@@ -51,12 +51,8 @@ dev = [
 ]
 
 [tool.uv.sources]
-# NOTE: the container installs prometheus_api from the checked-out sdk/, not from
-# this pin, so local tests can run against a different prometheus_api than the
-# image does. Keep this rev reasonably current with sdk/.
-# Working on prometheus_api locally? Override with:
-#   uv pip install -e /path/to/prometheus_api
-prometheus-api = { git = "https://github.inl.gov/genesis/prometheus_api.git", rev = "1914b557818cd6a9c558280c5789d7a67b8a0717" }
+# The repo's sdk/, the same prometheus_api the container installs
+prometheus-api = { path = "../../sdk", editable = true }
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
