@@ -1,0 +1,42 @@
+version: 2
+updates:
+  # Every uv project, one directory per uv.lock. Add a new uv project here when
+  # its uv.lock is committed; platform/tests/infrastructure/test_dependabot.py
+  # fails if one is missing. Updates go to devel weekly, minor and patch
+  # grouped into one PR, major updates one PR each. New releases wait a week
+  # before Dependabot proposes them
+  - package-ecosystem: uv
+    directories:
+      - /agent-template
+      - /platform/agents
+      - /platform/agents/client-agent
+      - /platform/backend
+      - /platform/docs
+      - /platform/tests
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    # Raise the lower bounds in pyproject.toml as well as uv.lock
+    versioning-strategy: increase
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # platform/backend and platform/tests lock sdk/'s pyproject.toml through
+  # their path source, so a change to it would leave their uv.lock stale.
+  # Update only sdk/uv.lock and leave its bounds for hand edits
+  - package-ecosystem: uv
+    directory: /sdk
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    versioning-strategy: lockfile-only
+    groups:
+      sdk:
+        patterns: ["*"]
+        update-types: [minor, patch]
