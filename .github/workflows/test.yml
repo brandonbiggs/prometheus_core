@@ -741,22 +741,13 @@ jobs:
         run: uv run --frozen --no-sync python -m pytest --color=yes -m "not integration"
 
   platform-compose:
-    name: "platform: compose debug=${{ matrix.debug }} optional=${{ matrix.optional }} system-test=${{ matrix.system-test }}"
+    name: "platform: compose"
     needs: gitleaks
     runs-on: ubuntu-26.04
-    strategy:
-      fail-fast: false
-      matrix:
-        debug: ["false", "true"]
-        optional: ["false", "true"]
-        system-test: ["false", "true"]
     defaults:
       run:
         working-directory: platform
     env:
-      DEBUG_AGENTS: ${{ matrix.debug }}
-      OPTIONAL_AGENTS: ${{ matrix.optional }}
-      SYSTEM_TEST: ${{ matrix.system-test }}
       # Placeholders for the variables .env sets, which init_env.py generates
       # in make up. config only interpolates them
       ADMIN_DB_PASSWORD: placeholder
@@ -775,23 +766,39 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Generate
-        run: make generate
       - name: Validate
-        # The same files the Makefile passes, with both profiles so every
-        # service is checked. Fails on warnings too, such as an unset variable
+        # Every combination of debug agents, optional agents and the system-test
+        # file, each after its own make generate. The same files the Makefile
+        # passes, with both profiles so every service is checked. Fails on
+        # warnings too, such as an unset variable
         run: |
-          files=(-f docker-compose.yml -f docker-compose.agents.yml -f docker-compose.build-cache.yml)
-          if [ "$SYSTEM_TEST" = true ]; then
-            files+=(-f docker-compose.system-test.yml)
-          fi
-          docker compose "${files[@]}" --profile dev --profile prod config -q 2> "$RUNNER_TEMP/config.log" \
-            || { cat "$RUNNER_TEMP/config.log"; exit 1; }
-          if [ -s "$RUNNER_TEMP/config.log" ]; then
-            cat "$RUNNER_TEMP/config.log"
-            echo "::error::docker compose config printed warnings"
-            exit 1
-          fi
+          failed=0
+          for debug in false true; do
+            for optional in false true; do
+              for system_test in false true; do
+                combo="debug=$debug optional=$optional system-test=$system_test"
+                echo "::group::compose $combo"
+                files=(-f docker-compose.yml -f docker-compose.agents.yml -f docker-compose.build-cache.yml)
+                if [ "$system_test" = true ]; then
+                  files+=(-f docker-compose.system-test.yml)
+                fi
+                if ! DEBUG_AGENTS=$debug OPTIONAL_AGENTS=$optional make generate; then
+                  echo "::error::make generate failed for $combo"
+                  failed=1
+                elif ! docker compose "${files[@]}" --profile dev --profile prod config -q 2> "$RUNNER_TEMP/config.log"; then
+                  cat "$RUNNER_TEMP/config.log"
+                  echo "::error::docker compose config failed for $combo"
+                  failed=1
+                elif [ -s "$RUNNER_TEMP/config.log" ]; then
+                  cat "$RUNNER_TEMP/config.log"
+                  echo "::error::docker compose config printed warnings for $combo"
+                  failed=1
+                fi
+                echo "::endgroup::"
+              done
+            done
+          done
+          exit $failed
 
   agent-template-compose:
     name: "agent-template: compose ${{ matrix.network }}"
