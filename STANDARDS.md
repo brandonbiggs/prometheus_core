@@ -84,7 +84,7 @@ Use a rule-specific `# noqa: E402`, never a bare `# noqa`. The same goes for
   when the name doesn't say enough.
 - Comments explain *why*, not *what*. Delete comments that restate the code.
 - Don't leave commented-out code; it's in the git history.
-- A `TODO` comment includes an issue or ticket reference (`# TODO(#123): ...`)
+- A `TODO` comment includes a Jira ticket reference (`# TODO(PPLT-123): ...`)
   so that it's tracked somewhere.
 - Behavior, configuration, and API changes update the component's README or
   docs in the same pull request (see [DEVELOPMENT.md](DEVELOPMENT.md)).
