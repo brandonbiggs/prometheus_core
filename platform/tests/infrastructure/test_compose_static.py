@@ -54,18 +54,23 @@ def test_each_service_has_image_or_build(compose_data, infrastructure_services):
         assert "image" in svc or "build" in svc, f"Service '{svc_name}' has neither 'image' nor 'build'"
 
 
+def _image_tag(svc):
+    """The service's image without its @sha256 digest."""
+    return svc["image"].split("@")[0]
+
+
 def test_postgres_image_version(compose_data):
-    assert compose_data["services"]["litellm-db"]["image"] == "postgres:16-alpine"
+    assert _image_tag(compose_data["services"]["litellm-db"]) == "postgres:16.15-alpine"
 
 
 def test_redis_service_uses_valkey_bundle(compose_data):
     svc = compose_data["services"]["redis"]
-    assert svc["image"] == "valkey/valkey-bundle:9.1.0"
+    assert _image_tag(svc) == "valkey/valkey-bundle:9.1.0"
     assert svc["command"][:1] == ["valkey-server"]
 
 
 def test_litellm_image_pinned(compose_data):
-    image = compose_data["services"]["litellm"]["image"]
+    image = _image_tag(compose_data["services"]["litellm"])
     assert image == "ghcr.io/berriai/litellm:v1.92.0", (
         "LiteLLM 1.92.0 is the minimum pinned gateway with A2A SDK v1 routing"
     )

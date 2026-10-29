@@ -91,3 +91,19 @@ updates:
     groups:
       docker:
         patterns: ["*"]
+
+  # The platform's service images. Majors are ignored: a postgres major needs
+  # a data migration, and litellm and valkey majors need checking by hand
+  - package-ecosystem: docker-compose
+    directory: /platform
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+    groups:
+      compose:
+        patterns: ["*"]
