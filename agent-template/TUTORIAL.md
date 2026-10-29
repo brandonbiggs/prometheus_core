@@ -606,10 +606,17 @@ ENV UV_PROJECT_ENVIRONMENT="/usr/local" \
 Configures uv to install packages into the system Python (where `prometheus_api` is already installed) rather than a separate virtual environment.
 
 ```dockerfile
-COPY pyproject.toml uv.lock* /app/
-RUN --mount=type=cache,...  uv sync --locked --no-dev --no-install-project --inexact
+FROM ... AS lockfile
+COPY uv.lock* /lock/
+RUN [ -f /lock/uv.lock ] || { echo "ERROR: uv.lock not found. ..."; exit 1; }
 ```
-Copies the dependency manifest and lockfile and installs your packages at the versions in `uv.lock`. The build fails if `uv.lock` is out of date with `pyproject.toml`. This layer is cached by Docker: if neither file has changed since the last build, Docker skips the `RUN` line entirely — making subsequent rebuilds very fast.
+A throwaway first stage that fails the build with instructions if `uv.lock` is missing. Run `uv sync` in your agent's directory to create it, and commit it. The lockfile is passed to the install step from this stage, so it doesn't end up in the final image.
+
+```dockerfile
+RUN --mount=type=cache,...  --mount=type=bind,source=pyproject.toml,... --mount=type=bind,from=lockfile,... \
+    uv sync --locked --no-dev --no-install-project --inexact
+```
+Installs your packages at the versions in `uv.lock`. The build fails if `uv.lock` is out of date with `pyproject.toml`. `pyproject.toml` and `uv.lock` are mounted for this step rather than copied, since the image doesn't need them. This layer is cached by Docker: if neither file has changed since the last build, Docker skips the `RUN` line entirely — making subsequent rebuilds very fast.
 
 ```dockerfile
 COPY agent.py /app/agent.py

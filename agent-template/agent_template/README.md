@@ -15,7 +15,7 @@ responses in the Prometheus web UI.
 | `prompts/` | Prompt template files loaded by your agent code when prompts get too large for `agent.py`. |
 | `workflows/` | Optional agent-owned workflow definitions inserted into the served agent card. |
 | `pyproject.toml` | Extra Python dependencies your code imports directly. |
-| `uv.lock` | Created by your first `uv sync`. Commit it with `pyproject.toml`. |
+| `uv.lock` | Created by your first `uv sync`. Commit it with `pyproject.toml`; the image build fails without it. |
 | `Dockerfile` | Builds the image from the pinned `prometheus_api` base image. |
 | `docker-compose.yml` | Common service definition for containerized runs. |
 | `docker-compose.net_internal.yml` | Default network include for joining the platform Docker network. |
