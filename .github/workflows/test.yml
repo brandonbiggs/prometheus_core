@@ -831,6 +831,24 @@ jobs:
           - agent: thermal-agent
             path: platform/agents/debug-agents/thermal-agent
             flag: thermal-agent
+          - agent: form-filler-agent
+            path: platform/agents/form-filler-agent
+            flag: form-filler-agent
+          - agent: synthesis-agent
+            path: platform/agents/synthesis-agent
+            flag: synthesis-agent
+          - agent: artifact-debug-agent
+            path: platform/agents/debug-agents/artifact-debug-agent
+            flag: artifact-debug-agent
+          - agent: material-data-agent
+            path: platform/agents/debug-agents/material-data-agent
+            flag: material-data-agent
+          - agent: radiation-agent
+            path: platform/agents/debug-agents/radiation-agent
+            flag: radiation-agent
+          - agent: thread-pattern-agent
+            path: platform/agents/debug-agents/thread-pattern-agent
+            flag: thread-pattern-agent
           - agent: agent-template
             path: agent-template/agent_template
             flag: template-agent

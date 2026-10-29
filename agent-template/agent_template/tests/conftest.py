@@ -31,6 +31,14 @@ if str(AGENT_DIR) not in sys.path:
 from prometheus_api.agent import EventQueue, RequestContext  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def agent_env(monkeypatch) -> None:
+    """Let build_app() run offline: it requires a bearer secret, and the
+    in-memory task store keeps it off Redis."""
+    monkeypatch.setenv("AGENT_SECRET", "test-secret")
+    monkeypatch.setenv("PROMETHEUS_TASK_STORE", "memory")
+
+
 @pytest.fixture
 def context() -> MagicMock:
     """A mock A2A request context with a stable conversation/context id."""

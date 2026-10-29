@@ -4,3 +4,18 @@ version = "0.1.0"
 description = "Debug agent demonstrating the offload-and-observe pattern for long blocking work"
 requires-python = ">=3.12"
 dependencies = []
+
+[tool.pytest.ini_options]
+# Async tests do not need @pytest.mark.asyncio.
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["."]
+relative_files = true
+omit = ["tests/*", ".venv/*"]
+
+[tool.coverage.report]
+# The lowest total across the supported Python versions; never lower it
+fail_under = 81.0
+precision = 2
