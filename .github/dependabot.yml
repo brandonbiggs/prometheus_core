@@ -8,8 +8,19 @@ updates:
   - package-ecosystem: uv
     directories:
       - /agent-template
+      - /agent-template/agent_template
       - /platform/agents
       - /platform/agents/client-agent
+      - /platform/agents/debug-agents/artifact-debug-agent
+      - /platform/agents/debug-agents/code-render-debug-agent
+      - /platform/agents/debug-agents/corrosion-agent
+      - /platform/agents/debug-agents/material-data-agent
+      - /platform/agents/debug-agents/radiation-agent
+      - /platform/agents/debug-agents/thermal-agent
+      - /platform/agents/debug-agents/thread-pattern-agent
+      - /platform/agents/form-filler-agent
+      - /platform/agents/optional/osti-research-agent
+      - /platform/agents/synthesis-agent
       - /platform/backend
       - /platform/docs
       - /platform/tests
