@@ -39,6 +39,7 @@ jobs:
       sha: ${{ steps.meta.outputs.sha }}
       tag: ${{ steps.meta.outputs.tag }}
       prefix: ${{ steps.meta.outputs.prefix }}
+      suffix: ${{ steps.meta.outputs.suffix }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,6 +61,7 @@ jobs:
             echo "sha=$sha"
             echo "tag=$tag"
             echo "prefix=$prefix"
+            echo "suffix=-devel"
           } >> "$GITHUB_OUTPUT"
 
   sdk:
@@ -70,8 +72,9 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-image.yml
     with:
+      prefix: ${{ needs.meta.outputs.prefix }}
       name: sdk
-      image: ${{ needs.meta.outputs.prefix }}/prometheus_sdk-devel
+      suffix: ${{ needs.meta.outputs.suffix }}
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       context: sdk
@@ -86,8 +89,9 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-image.yml
     with:
+      prefix: ${{ needs.meta.outputs.prefix }}
       name: backend
-      image: ${{ needs.meta.outputs.prefix }}/prometheus_backend-devel
+      suffix: ${{ needs.meta.outputs.suffix }}
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       # Same context and sdk/certs contexts as docker-compose.yml
@@ -105,8 +109,9 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-image.yml
     with:
+      prefix: ${{ needs.meta.outputs.prefix }}
       name: frontend
-      image: ${{ needs.meta.outputs.prefix }}/prometheus_frontend-devel
+      suffix: ${{ needs.meta.outputs.suffix }}
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       # Same context, target, and certs context as docker-compose.yml
@@ -125,6 +130,7 @@ jobs:
       - name: Write summary
         env:
           PREFIX: ${{ needs.meta.outputs.prefix }}
+          SUFFIX: ${{ needs.meta.outputs.suffix }}
           TAG: ${{ needs.meta.outputs.tag }}
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           SDK_RESULT: ${{ needs.sdk.result }}
@@ -143,8 +149,8 @@ jobs:
           # the package name is the image path after the owner, slash encoded
           repo_name="${PREFIX#ghcr.io/*/}"
           row() {
-            local image="$PREFIX/prometheus_$1-devel:$TAG"
-            local package_url="$REPO_URL/pkgs/container/$repo_name%2Fprometheus_$1-devel"
+            local image="$PREFIX/prometheus_$1$SUFFIX:$TAG"
+            local package_url="$REPO_URL/pkgs/container/$repo_name%2Fprometheus_$1$SUFFIX"
             echo "| $1 | [\`$image\`]($package_url) | $(status "$2") |"
           }
           {
