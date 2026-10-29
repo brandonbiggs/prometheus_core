@@ -764,6 +764,10 @@ host-published platform services from inside the container; inside the container
 
 #### In-tree platform deployment
 
+<!-- Keep in sync with the "agent-template: platform" job in
+     .github/workflows/test.yml, which runs these steps in CI. If you change
+     the in-tree steps here or in Step 9, update the job to match. -->
+
 If you want your agent to be part of the main platform stack and launched by the
 platform's `make up`, copy your project directory into
 `platform/agents/<your-agent-name>/`. The platform's Makefile
@@ -909,6 +913,11 @@ Registration retries with exponential backoff (default: 10 attempts, up to 30 se
 If you need the agent to restart automatically when the platform does, add it to the platform team's infrastructure configuration or document the startup order for your deployment environment.
 
 ### In-tree deployment
+
+<!-- Keep in sync with the "agent-template: platform" job in
+     .github/workflows/test.yml, which runs these steps in CI (scaffold,
+     uv sync, copy to platform/agents/, make generate, make up, then a check
+     that the agent registered). If you change them, update the job to match. -->
 
 1. Copy your project directory to `platform/agents/<your-agent-name>/`.
 2. From `platform/`:
