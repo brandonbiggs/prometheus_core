@@ -468,6 +468,9 @@ def create_agent(replacements: dict[str, str], assume_defaults: bool = False) ->
             continue
         if file_path.suffix in [".pyc", ".pyo", ".pyd", ".so", ".dll"]:
             continue
+        # Locks the template's own name; the new agent's first uv sync locks its own
+        if file_path.name == "uv.lock":
+            continue
 
         process_file(file_path, replacements, output_dir)
 
