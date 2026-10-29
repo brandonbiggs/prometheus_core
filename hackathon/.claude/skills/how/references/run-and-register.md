@@ -8,7 +8,7 @@ Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no Lite
 `prometheus_platform_agent-network` (`agent_template/Makefile:71-73`); without the network it
 stops with "The Prometheus Platform must be launched first…". The build needs a committed `uv.lock`
 (`uv add <pkg>`, then commit it with `pyproject.toml`; `agent-lockfile`). The image holds the code and the
-card (`agent_template/Dockerfile:34-37`), and Compose reads `environment:` only on create: after
+card (`agent_template/Dockerfile:46-49`), and Compose reads `environment:` only on create: after
 any change, run `make up`, not `docker restart`. `make logs` never ends; use `docker logs`. The agent exits at
 startup with "Invalid required DeepLynx configuration: …" without the `DEEPLYNX_*` values (`deeplynx-env`).
 

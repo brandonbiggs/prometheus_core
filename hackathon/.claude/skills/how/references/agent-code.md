@@ -87,6 +87,6 @@ Import `MissingInput` and `PrometheusWorker` from `prometheus_api.agent`.
 - `pyproject.toml`: your dependencies only. Never add `prometheus_api`, `a2a-sdk`, `starlette`, or
   `uvicorn`: the base image has them (deck 04, A5). Commit `uv.lock` with it.
 - `Dockerfile`: it copies only `agent.py`, `agent_card.json`, `prompts/`, and `workflows/`
-  (`agent_template/Dockerfile:34-37`). Add a `COPY` line per new module, else `ModuleNotFoundError`.
+  (`agent_template/Dockerfile:46-49`). Add a `COPY` line per new module, else `ModuleNotFoundError`.
 - `Makefile`: `up`, `up-fg`, `down`, `logs`. `make logs` never ends; use `docker logs <slug>-agent`.
 - `docker-compose.yml`: the container gets only the variables that `environment:` lists.
