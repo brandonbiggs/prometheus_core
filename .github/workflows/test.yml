@@ -801,45 +801,47 @@ jobs:
           exit $failed
 
   agent-template-compose:
-    name: "agent-template: compose ${{ matrix.network }}"
+    name: "agent-template: compose"
     needs: gitleaks
     runs-on: ubuntu-26.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - network: internal
-          - network: external
-            host: localhost
-            port: "8042"
     defaults:
       run:
         working-directory: agent-template/agent_template
     env:
-      NETWORK: ${{ matrix.network }}
       # Placeholders for the variables .env sets. config only interpolates them
       AGENT_SECRET: placeholder
       LITELLM_MASTER_KEY: placeholder
       REDIS_PASSWORD: placeholder
-      # Set together for external mode, as the Makefile requires
-      EXTERNAL_AGENT_HOST: ${{ matrix.host }}
-      EXTERNAL_AGENT_PORT: ${{ matrix.port }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Validate
-        # The same files the Makefile passes. Fails on warnings too, such as
-        # an unset variable
+        # Each network mode, with the same files the Makefile passes. External
+        # mode sets the host and port together, as the Makefile requires. Fails
+        # on warnings too, such as an unset variable
         run: |
-          docker compose -f docker-compose.yml -f "docker-compose.net_$NETWORK.yml" config -q 2> "$RUNNER_TEMP/config.log" \
-            || { cat "$RUNNER_TEMP/config.log"; exit 1; }
-          if [ -s "$RUNNER_TEMP/config.log" ]; then
-            cat "$RUNNER_TEMP/config.log"
-            echo "::error::docker compose config printed warnings"
-            exit 1
-          fi
+          failed=0
+          for network in internal external; do
+            echo "::group::compose $network"
+            if [ "$network" = external ]; then
+              export EXTERNAL_AGENT_HOST=localhost EXTERNAL_AGENT_PORT=8042
+            else
+              unset EXTERNAL_AGENT_HOST EXTERNAL_AGENT_PORT
+            fi
+            if ! docker compose -f docker-compose.yml -f "docker-compose.net_$network.yml" config -q 2> "$RUNNER_TEMP/config.log"; then
+              cat "$RUNNER_TEMP/config.log"
+              echo "::error::docker compose config failed for $network"
+              failed=1
+            elif [ -s "$RUNNER_TEMP/config.log" ]; then
+              cat "$RUNNER_TEMP/config.log"
+              echo "::error::docker compose config printed warnings for $network"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $failed
 
   # Follows the in-tree deployment path in agent-template/TUTORIAL.md (Step 1,
   # then Step 9): scaffold an agent, uv sync, copy it to platform/agents/, then
