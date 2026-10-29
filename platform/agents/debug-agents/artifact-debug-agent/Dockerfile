@@ -18,9 +18,10 @@ RUN apt-get update \
 ENV UV_PROJECT_ENVIRONMENT="/usr/local" \
     UV_LINK_MODE=copy
 
-COPY pyproject.toml /app/
 RUN --mount=type=cache,id=prometheus-uv-cache,target=/root/.cache/uv,sharing=locked \
-    uv sync --no-dev --no-install-project --inexact
+    --mount=type=bind,source=pyproject.toml,target=/app/pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=/app/uv.lock \
+    uv sync --locked --no-dev --no-install-project --inexact
 
 
 COPY agent.py /app/agent.py

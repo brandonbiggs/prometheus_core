@@ -37,3 +37,8 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+# The SDK ships no py.typed marker, and is not installed in this environment
+module = ["prometheus_api", "prometheus_api.*"]
+ignore_missing_imports = true

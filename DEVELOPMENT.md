@@ -4,6 +4,8 @@
 `devel`, run the checks, open a pull request. This guide explains how we scope
 work, structure pull requests, and review them, and why. It applies to
 maintainers and outside contributors alike.
+Coding standards (style, types, errors, logging, dependencies) are in
+[STANDARDS.md](STANDARDS.md).
 
 Component-specific setup and commands live with each component:
 [sdk/DEVELOPMENT.md](sdk/DEVELOPMENT.md), [platform/README.md](platform/README.md),
@@ -35,8 +37,8 @@ own PR:
 - reformatting or lint cleanups
 - a documentation pass
 
-If you find an unrelated problem along the way, note it in an issue or fix it in
-a separate PR. Don't fold it into the current one.
+If you find an unrelated problem along the way, note it in a Jira ticket or fix
+it in a separate PR. Don't fold it into the current one.
 
 ### Size
 
@@ -60,7 +62,7 @@ When a change crosses components (for example, an SDK API used by the
 platform), land the SDK side first. Then update the callers in a following PR,
 unless both sides have to change together to keep CI green.
 
-For a series of more than two or three PRs, open a tracking issue that lists
+For a series of more than two or three PRs, open a Jira ticket that lists
 them and check them off as they merge.
 
 ### Stacked pull requests
@@ -129,7 +131,7 @@ The [PR template](.github/PULL_REQUEST_TEMPLATE.md) asks for **Reason**,
 change before opening the diff:
 
 - **Reason:** the problem, with a concrete example if possible (an error
-  message, a request that fails, a confusing UI state). Link the issue or ticket.
+  message, a request that fails, a confusing UI state). Link the Jira ticket.
 - **Design:** the approach, and any alternatives you rejected and why. Point
   reviewers at the important file or function if the diff is large.
 - **Impact:** what existing users, agents, or deployments will notice. Write
@@ -245,7 +247,7 @@ merge commit, and the branch is deleted automatically.
 
 After merging:
 
-- Close or update the linked issue if `closes #N` didn't do it.
+- Update or close the linked Jira ticket.
 - Update any stacked PRs that depended on this one.
 - If the change needs a deploy, an image rebuild, or a `PROMETHEUS_API_BASE_IMAGE_HASH`
   bump in `platform/Makefile`, make sure someone owns that step.

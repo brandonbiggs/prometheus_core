@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- base (shared) ----
-FROM node:22.19.0-bookworm-slim AS base
+FROM node:22.23.3-bookworm-slim@sha256:3ed98443660ff48413b5af19ecefce3b9d50845a901a43420d47cc63a9fddbe9 AS base
 WORKDIR /app
 
 RUN apt-get update \
@@ -36,7 +36,7 @@ COPY frontend/. .
 RUN npm run build
 
 # ---- prod ----
-FROM nginx:alpine AS prod
+FROM nginx:1.31.8-alpine@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606 AS prod
 # The nginx image renders /etc/nginx/templates/*.template into conf.d/ at start,
 # substituting ${BACKEND_UPSTREAM}.
 ENV BACKEND_UPSTREAM=http://backend:8000

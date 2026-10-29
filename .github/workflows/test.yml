@@ -75,13 +75,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
       - name: Sync environment
         # Only the dev group, for each project's locked ruff version
-        run: uv sync --frozen --only-dev --no-install-package prometheus-api
+        run: uv sync --frozen --only-dev
       - name: Check
         run: uv run --frozen --no-sync ruff check --output-format=github .
       - name: Format
@@ -111,7 +111,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -131,6 +131,19 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+  image-pins:
+    # Every Dockerfile FROM and compose image: is pinned by digest, so a tag
+    # can't silently move. Dependabot keeps the tag and digest current
+    name: "image pins"
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check
+        run: python3 platform/scripts/check_image_pins.py
 
   hadolint-shellcheck:
     # hadolint on every Dockerfile and shellcheck on every shell script, found
@@ -272,7 +285,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -300,7 +313,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -331,7 +344,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -362,7 +375,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -387,7 +400,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -406,7 +419,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Typecheck
         if: ${{ !cancelled() }}
-        run: uv run --frozen mypy setup_agent.py
+        run: uv run --frozen mypy .
 
   agent-template-scaffold:
     name: "agent-template: scaffold python ${{ matrix.python }}"
@@ -422,7 +435,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -519,7 +532,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # Matches the node image in frontend/Dockerfile
           node-version: "22.19.0"
@@ -614,14 +627,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
       - name: Sync environment
-        run: |
-          uv sync --frozen --no-install-package prometheus-api
-          uv pip install --no-deps ../../sdk
+        run: uv sync --frozen
       - name: Type check
         run: uv run --frozen --no-sync mypy app
       - name: Test
@@ -649,14 +660,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
       - name: Sync environment
-        run: |
-          uv sync --frozen --no-install-package prometheus-api
-          uv pip install --no-deps ../../sdk
+        run: uv sync --frozen
       - name: Test
         # Integration tests need the running platform. python -m puts the
         # current directory on sys.path, which the tests need to import system/
@@ -789,7 +798,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -800,9 +809,7 @@ jobs:
         run: make up
       - name: Sync test environment
         working-directory: platform/tests
-        run: |
-          uv sync --frozen --no-install-package prometheus-api
-          uv pip install --no-deps ../../sdk
+        run: uv sync --frozen
       - name: Integration tests
         # Against the stack make up started: the tests find it running and use
         # it, with the credentials and ports in platform/.env
@@ -830,7 +837,7 @@ jobs:
           cat "$RUNNER_TEMP/logs/all.log"
       - name: Upload logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: platform-up-logs
           path: ${{ runner.temp }}/logs/
@@ -894,18 +901,25 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
       - name: Install dependencies
+        # Like the agent images: prometheus_api first, then the agent's locked
+        # dependencies on top. An agent with overrides resolves fresh instead,
+        # since its uv.lock doesn't have them
         env:
           OVERRIDES: ${{ matrix.overrides }}
         run: |
-          printf '%s\n' "$OVERRIDES" > "$RUNNER_TEMP/overrides.txt"
           uv venv
-          uv pip install -r pyproject.toml --overrides "$RUNNER_TEMP/overrides.txt" \
-            pytest pytest-asyncio pytest-cov "$GITHUB_WORKSPACE/sdk"
+          uv pip install pytest pytest-asyncio pytest-cov "$GITHUB_WORKSPACE/sdk"
+          if [ -n "$OVERRIDES" ]; then
+            printf '%s\n' "$OVERRIDES" > "$RUNNER_TEMP/overrides.txt"
+            uv pip install -r pyproject.toml --overrides "$RUNNER_TEMP/overrides.txt"
+          else
+            uv sync --locked --no-dev --no-install-project --inexact
+          fi
       - name: Test
         # Agents with a flag fail below fail_under in their pyproject.toml
         run: .venv/bin/python -m pytest --color=yes ${{ matrix.flag && '--cov --cov-report=xml' || '' }}

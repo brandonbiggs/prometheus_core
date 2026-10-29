@@ -8,7 +8,7 @@
 #   certs  the repo's common/certs directory (CA certs + setup.sh)
 #
 # The base is the same pinned uv + Python 3.12 image sdk/Dockerfile builds on.
-FROM ghcr.io/astral-sh/uv:0.11.25-python3.12-trixie-slim@sha256:1b9ee30381d729b07044688631ba4473c72db5c048a5f2a504c40186e65efb86
+FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim@sha256:bf889bda77474aa50c351caf1538b855ef2b7a30add45f26ca50dcb6ade06402
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -37,13 +37,13 @@ RUN --mount=type=bind,from=sdk,source=pyproject.toml,target=/src/pyproject.toml 
 
 WORKDIR /app
 
-# `prometheus-api` is a dev-only dependency in pyproject.toml, pinned to a private
-# git branch via [tool.uv.sources] for local tests. It is already installed above,
-# and at image build time we must NOT fetch that private repo, so:
+# `prometheus-api` is a dev-only dependency in pyproject.toml, sourced from
+# ../../sdk via [tool.uv.sources] for local tests. It is already installed above,
+# and that path isn't in this build context, so:
 #   --no-dev       exclude the dev group (we don't reinstall prometheus-api)
-#   --no-sources   ignore [tool.uv.sources] entirely, so uv never clones the git
-#                  repo while resolving the lock (the deciding flag — --no-dev alone
-#                  still resolves the source)
+#   --no-sources   ignore [tool.uv.sources] entirely, so uv never looks for the
+#                  path while resolving (the deciding flag — --no-dev alone still
+#                  resolves the source)
 #   --inexact      keep the prometheus-api + deps installed above
 #   --no-install-project  don't install backend itself; the code is COPYed below
 ENV UV_PROJECT_ENVIRONMENT="/usr/local" \
