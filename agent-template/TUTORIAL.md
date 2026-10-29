@@ -69,6 +69,7 @@ my-agent/
 ├── workflows/
 ├── pyproject.toml
 ├── Dockerfile
+├── .dockerignore
 ├── docker-compose.yml
 └── .env.example
 ```

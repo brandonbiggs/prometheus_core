@@ -54,6 +54,7 @@ my-agent/
 ├── workflows/
 ├── pyproject.toml
 ├── Dockerfile
+├── .dockerignore
 ├── docker-compose.yml
 ├── docker-compose.net_internal.yml
 ├── docker-compose.net_external.yml
