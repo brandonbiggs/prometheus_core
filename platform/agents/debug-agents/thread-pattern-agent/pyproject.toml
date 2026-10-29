@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [tool.pytest.ini_options]
+# Async tests do not need @pytest.mark.asyncio.
 asyncio_mode = "auto"
 testpaths = ["tests"]
 

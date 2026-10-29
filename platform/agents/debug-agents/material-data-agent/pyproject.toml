@@ -8,6 +8,7 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
+# Async tests do not need @pytest.mark.asyncio.
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
@@ -18,5 +19,5 @@ omit = ["tests/*", ".venv/*"]
 
 [tool.coverage.report]
 # The lowest total across the supported Python versions; never lower it
-fail_under = 45.7
+fail_under = 50.0
 precision = 2
