@@ -70,3 +70,24 @@ updates:
       frontend:
         patterns: ["*"]
         update-types: [minor, patch]
+
+  # Base images pinned by tag and digest. The agent Dockerfiles build FROM the
+  # prometheus_api base image through build args, which Dependabot can't
+  # resolve; that hash is bumped by hand in platform/Makefile. Majors are
+  # ignored: node's should move with the frontend's node-version in CI
+  - package-ecosystem: docker
+    directories:
+      - /sdk
+      - /platform/backend
+      - /platform/frontend
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+    groups:
+      docker:
+        patterns: ["*"]
