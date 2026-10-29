@@ -12,7 +12,7 @@
 
 import path from "path";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import tailwindcss from "@tailwindcss/vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
@@ -42,6 +42,24 @@ export default defineConfig({
   // their dynamic imports in DEV, which puts them in the initial scan already.
   optimizeDeps: {
     include: ["mermaid"],
+  },
+  test: {
+    // Logic tests (*.test.ts) run in Node; component tests (*.test.tsx) get a DOM
+    projects: [
+      {
+        extends: true,
+        test: { name: "unit", environment: "node", include: ["src/**/*.test.ts"] },
+      },
+      {
+        extends: true,
+        test: {
+          name: "component",
+          environment: "jsdom",
+          include: ["src/**/*.test.tsx"],
+          setupFiles: ["src/test/setup.ts"],
+        },
+      },
+    ],
   },
   server: {
     port: 5150,

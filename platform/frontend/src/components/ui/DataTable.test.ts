@@ -11,26 +11,10 @@
 // SPDX-License-Identifier: MIT
 
 import assert from "node:assert/strict";
-import { createRequire, register } from "node:module";
-import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { test } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-
-/* The component, compiled from .tsx by esbuild (see FilterChips.test.ts for why a loader hook). */
-const ESBUILD = pathToFileURL(createRequire(import.meta.url).resolve("esbuild")).href;
-const hooks = `
-import { transform } from ${JSON.stringify(ESBUILD)};
-export async function load(url, context, next) {
-  if (!url.endsWith(".tsx")) return next(url, context);
-  const loaded = await next(url, { ...context, format: "module" });
-  const { code } = await transform(String(loaded.source), { loader: "tsx", jsx: "automatic", format: "esm" });
-  return { format: "module", shortCircuit: true, source: code };
-}
-`;
-register("data:text/javascript," + encodeURIComponent(hooks));
-
-const { DataTable } = await import("./DataTable.tsx");
+import { DataTable } from "./DataTable.tsx";
 
 type Person = { id: string; name: string; role: string; seen: string | null };
 const PEOPLE: Person[] = [

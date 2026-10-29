@@ -11,48 +11,36 @@
 // SPDX-License-Identifier: MIT
 
 import assert from "node:assert/strict";
-import { register } from "node:module";
-import test, { afterEach } from "node:test";
+import { afterEach, test, vi } from "vitest";
+import { ApiError } from "@/lib/api/client";
+import { chatStore, useChatState as tapChatState } from "./chat.ts";
 
 /* The real chat store, with the API client, the SSE client and React stubbed out.
- * A loader hook is needed because the store imports them through the `@/` alias
- * and without extensions, which Node does not resolve by itself; the client also
- * uses constructor parameter properties, which type stripping cannot run. */
-const SRC = new URL("../../", import.meta.url).href; // .../frontend/src/
-const hooks = `
-const SRC = ${JSON.stringify(SRC)};
-const STUBS = {
-  "@/lib/api/client": "stub:client",
-  "@/lib/api/events": "stub:events",
-  react: "stub:react",
-};
-export async function resolve(specifier, context, next) {
-  if (STUBS[specifier]) return { url: STUBS[specifier], shortCircuit: true };
-  const spec = specifier.startsWith("@/") ? SRC + specifier.slice(2) : specifier;
-  const fromTs = context.parentURL && context.parentURL.endsWith(".ts");
-  const isRel = spec.startsWith("./") || spec.startsWith("../") || spec.startsWith("file:");
-  if ((fromTs || specifier.startsWith("@/")) && isRel && !/\\.[cm]?[jt]sx?$/.test(spec)) {
-    return next(spec + ".ts", context);
-  }
-  return next(spec, context);
-}
-const SOURCES = {
-  "stub:react":
-    "export function useSyncExternalStore(sub, get) { globalThis.__chatTestTap = get; return get(); }",
-  "stub:events": "export function openEventStream() { return () => {}; }",
-  "stub:client": \`
-    export class ApiError extends Error {
-      constructor(status, message) { super(message); this.status = status; this.name = "ApiError"; }
+ * Each test sets the API it needs on globalThis.__chatTestApi; the React stub
+ * leaves the store's getSnapshot on globalThis.__chatTestTap. */
+vi.mock("react", () => ({
+  useSyncExternalStore: (_sub: unknown, get: () => unknown) => {
+    (globalThis as Record<string, unknown>).__chatTestTap = get;
+    return get();
+  },
+}));
+vi.mock("@/lib/api/events", () => ({ openEventStream: () => () => {} }));
+vi.mock("@/lib/api/client", () => {
+  class StubApiError extends Error {
+    constructor(
+      public status: number,
+      message: string,
+    ) {
+      super(message);
+      this.name = "ApiError";
     }
-    export const api = new Proxy({}, { get: (_t, k) => (...a) => globalThis.__chatTestApi[k](...a) });
-  \`,
-};
-export async function load(url, context, next) {
-  if (SOURCES[url]) return { format: "module", shortCircuit: true, source: SOURCES[url] };
-  return next(url, context);
-}
-`;
-register("data:text/javascript," + encodeURIComponent(hooks));
+  }
+  const api = new Proxy(
+    {},
+    { get: (_t, k: string) => (...a: unknown[]) => (globalThis as unknown as { __chatTestApi: Api }).__chatTestApi[k](...a) },
+  );
+  return { ApiError: StubApiError, api };
+});
 
 type Api = Record<string, (...a: unknown[]) => Promise<unknown>>;
 const g = globalThis as unknown as {
@@ -61,10 +49,6 @@ const g = globalThis as unknown as {
   sessionStorage: unknown;
 };
 
-const { chatStore, useChatState: tapChatState } = await import("./chat.ts");
-const { ApiError } = (await import("@/lib/api/client" as string)) as {
-  ApiError: new (status: number, message: string) => Error;
-};
 tapChatState(); // not a render: the stubbed hook hands back the store's getSnapshot
 const readState = () => g.__chatTestTap();
 afterEach(() => chatStore.clear()); // the store is a module singleton

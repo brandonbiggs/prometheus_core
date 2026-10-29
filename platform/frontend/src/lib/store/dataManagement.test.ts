@@ -11,31 +11,13 @@
 // SPDX-License-Identifier: MIT
 
 import assert from "node:assert/strict";
-import { register } from "node:module";
-import test from "node:test";
+import { test, vi } from "vitest";
+import { useDataManagement, derive, storagePercent, formatBytes } from "./dataManagement.ts";
 
 /* The real Data Management store, with React stubbed out as in chat.test.ts.
  * Outside a render the real useSyncExternalStore has no dispatcher, so the stub
  * returns the store's snapshot directly. */
-const hooks = `
-export async function resolve(specifier, context, next) {
-  if (specifier === "react") return { url: "stub:react", shortCircuit: true };
-  return next(specifier, context);
-}
-export async function load(url, context, next) {
-  if (url === "stub:react") {
-    return {
-      format: "module",
-      shortCircuit: true,
-      source: "export function useSyncExternalStore(sub, get) { return get(); }",
-    };
-  }
-  return next(url, context);
-}
-`;
-register("data:text/javascript," + encodeURIComponent(hooks));
-
-const { useDataManagement, derive, storagePercent, formatBytes } = await import("./dataManagement.ts");
+vi.mock("react", () => ({ useSyncExternalStore: (_sub: unknown, get: () => unknown) => get() }));
 
 test("useDataManagement returns ready state with six sources and six artifacts", () => {
   const state = useDataManagement(); // not a render: the stubbed hook returns the snapshot
