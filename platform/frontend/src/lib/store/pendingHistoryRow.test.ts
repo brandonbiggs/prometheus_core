@@ -15,7 +15,7 @@
 // while it awaits a reply and is missing from the server list, and returns the server list
 // unchanged otherwise.
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import { withPendingRow, type HistoryRowLike, type OpenConversation } from "./pendingHistoryRow.ts";
 

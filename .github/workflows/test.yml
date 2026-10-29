@@ -565,8 +565,28 @@ jobs:
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck
-      - name: Unit tests
-        run: node --test --experimental-strip-types 'src/**/*.test.ts'
+      - name: Tests
+        run: npm run test:coverage
+      # The shared coverage action reads Python's coverage report, so the
+      # frontend's summary, path prefix and upload are done here instead
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          total=$(node -p 'require("./coverage/coverage-summary.json").total.lines.pct')
+          echo "frontend line coverage: **${total}%**" >> "$GITHUB_STEP_SUMMARY"
+      - name: Prefix coverage paths
+        if: ${{ !cancelled() }}
+        # Report names are relative to the frontend; make them repo-root-relative
+        run: sed -i 's#filename="#filename="platform/frontend/#' coverage/cobertura-coverage.xml
+      - name: Upload coverage
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: frontend
+          files: platform/frontend/coverage/cobertura-coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
       - name: Build
         run: npm run build
 
