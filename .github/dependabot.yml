@@ -55,3 +55,18 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+
+  # The frontend's package.json and package-lock.json. npm ci in CI fails a
+  # stale lockfile
+  - package-ecosystem: npm
+    directory: /platform/frontend
+    schedule:
+      interval: weekly
+    target-branch: devel
+    cooldown:
+      default-days: 7
+    versioning-strategy: increase
+    groups:
+      frontend:
+        patterns: ["*"]
+        update-types: [minor, patch]
