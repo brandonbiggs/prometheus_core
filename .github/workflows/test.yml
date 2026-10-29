@@ -54,27 +54,8 @@ jobs:
           gitleaks git --redact --no-banner --log-opts="$BASE_SHA..$HEAD_SHA" .
 
   ruff:
-    name: "ruff ${{ matrix.project }}"
+    name: "ruff"
     runs-on: ubuntu-26.04
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - sdk
-          - platform/backend
-          - platform/tests
-          - platform/scripts
-          - platform/agents
-          - agent-template
-        include:
-          # Not a uv project; linted with platform/tests' locked ruff
-          - project: platform/scripts
-            uv-project: ../tests
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    env:
-      UV_PROJECT: ${{ matrix.uv-project || '.' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,14 +66,47 @@ jobs:
         with:
           version: "0.11.25"
           python-version: "3.12"
-      - name: Sync environment
-        # Only the dev group, for each project's locked ruff version
-        run: uv sync --frozen --only-dev
       - name: Check
-        run: uv run --frozen --no-sync ruff check --output-format=github .
-      - name: Format
-        if: ${{ !cancelled() }}
-        run: uv run --frozen --no-sync ruff format --check --diff .
+        # Every project is checked even if an earlier one fails; the step fails
+        # at the end if any did. Each project uses its own locked ruff version
+        # from just the dev group
+        run: |
+          # <project>[:<uv project, relative to it>]. platform/scripts isn't a
+          # uv project, so it's linted with platform/tests' locked ruff
+          projects=(
+            sdk
+            platform/backend
+            platform/tests
+            platform/scripts:../tests
+            platform/agents
+            agent-template
+          )
+          failed=()
+          for entry in "${projects[@]}"; do
+            project="${entry%%:*}"
+            uv_project="."
+            if [[ "$entry" == *:* ]]; then uv_project="${entry#*:}"; fi
+
+            echo "::group::ruff $project"
+            if ! (
+              set -e
+              cd "$project"
+              export UV_PROJECT="$uv_project"
+              uv sync --frozen --only-dev
+              rc=0
+              uv run --frozen --no-sync ruff check --output-format=github . || rc=1
+              uv run --frozen --no-sync ruff format --check --diff . || rc=1
+              exit "$rc"
+            ); then
+              failed+=("$project")
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "::error::ruff failed in: ${failed[*]}"
+            exit 1
+          fi
 
   markings:
     name: "markings"
