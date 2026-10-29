@@ -505,6 +505,9 @@ jobs:
           push: false
           load: true
           tags: sdk:${{ matrix.platform }}
+          # Read-only: the cache publish-images writes on devel (see
+          # build-image.yml). The package is public, so no login is needed
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-prometheus_sdk-devel:${{ matrix.platform }}
       - name: Test
         # The image only has the installed package; mount the checkout for
         # pyproject.toml, uv.lock, and the tests
@@ -578,6 +581,9 @@ jobs:
           build-contexts: certs=common/certs
           platforms: linux/${{ matrix.platform }}
           push: false
+          # Read-only: the cache publish-images writes on devel (see
+          # build-image.yml). The package is public, so no login is needed
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-prometheus_frontend-devel:${{ matrix.platform }}
 
   platform-backend-docker:
     name: "platform: backend docker ${{ matrix.platform }}"
@@ -609,6 +615,9 @@ jobs:
             certs=common/certs
           platforms: linux/${{ matrix.platform }}
           push: false
+          # Read-only: the cache publish-images writes on devel (see
+          # build-image.yml). The package is public, so no login is needed
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-prometheus_backend-devel:${{ matrix.platform }}
 
   platform-backend-python:
     name: "platform: backend python ${{ matrix.python }}"

@@ -72,6 +72,7 @@ jobs:
     with:
       name: sdk
       image: ${{ needs.meta.outputs.prefix }}/prometheus_sdk-devel
+      cache-image: ${{ needs.meta.outputs.prefix }}/buildcache-prometheus_sdk-devel
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       context: sdk
@@ -88,6 +89,7 @@ jobs:
     with:
       name: backend
       image: ${{ needs.meta.outputs.prefix }}/prometheus_backend-devel
+      cache-image: ${{ needs.meta.outputs.prefix }}/buildcache-prometheus_backend-devel
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       # Same context and sdk/certs contexts as docker-compose.yml
@@ -107,6 +109,7 @@ jobs:
     with:
       name: frontend
       image: ${{ needs.meta.outputs.prefix }}/prometheus_frontend-devel
+      cache-image: ${{ needs.meta.outputs.prefix }}/buildcache-prometheus_frontend-devel
       tag: ${{ needs.meta.outputs.tag }}
       sha: ${{ needs.meta.outputs.sha }}
       # Same context, target, and certs context as docker-compose.yml
