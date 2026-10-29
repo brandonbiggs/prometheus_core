@@ -754,6 +754,8 @@ jobs:
       LLM_CONFIG_PROFILE: placeholder
       PROMETHEUS_API_BASE_IMAGE_HASH: placeholder
       REDIS_PASSWORD: placeholder
+      # For docker-compose.build-cache.yml, with BUILD_CACHE from the workflow
+      BUILD_CACHE_PLATFORM: amd64
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -765,7 +767,7 @@ jobs:
         # The same files the Makefile passes, with both profiles so every
         # service is checked. Fails on warnings too, such as an unset variable
         run: |
-          files=(-f docker-compose.yml -f docker-compose.agents.yml)
+          files=(-f docker-compose.yml -f docker-compose.agents.yml -f docker-compose.build-cache.yml)
           if [ "$SYSTEM_TEST" = true ]; then
             files+=(-f docker-compose.system-test.yml)
           fi
@@ -906,6 +908,10 @@ jobs:
       - name: Generate
         # TUTORIAL.md Step 9. Lists the agents make up will start
         run: make generate
+      - name: Use the containerd image store
+        # CI only: make up imports the registry build cache, which the default
+        # builder can only do with this store
+        uses: ./.github/actions/containerd-image-store
       - name: Start
         # TUTORIAL.md Step 9. Waits for every healthcheck, then make check
         # waits for every agent, the scaffolded one included, to be registered
@@ -994,6 +1000,10 @@ jobs:
         with:
           version: "0.11.25"
           python-version: "3.12"
+      - name: Use the containerd image store
+        # make up imports the registry build cache, which the default builder
+        # can only do with this store
+        uses: ./.github/actions/containerd-image-store
       - name: Start
         # make up waits for every healthcheck, then runs make check: the
         # backend and frontend on their host ports, the frontend's /api proxy,

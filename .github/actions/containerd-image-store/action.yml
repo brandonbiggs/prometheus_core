@@ -1,0 +1,23 @@
+name: containerd-image-store
+description: Switch the runner's Docker to the containerd image store, so the default builder can import a registry build cache
+
+# Not setup-buildx-action: its docker-container builder can't see images in the
+# local store, and the compose jobs build the agents FROM prometheus_api:local
+
+runs:
+  using: composite
+  steps:
+    - name: Enable
+      shell: bash
+      run: |
+        config=/etc/docker/daemon.json
+        [ -s "$config" ] || echo '{}' | sudo tee "$config" > /dev/null
+        jq '.features["containerd-snapshotter"] = true' "$config" | sudo tee "$config.new" > /dev/null
+        sudo mv "$config.new" "$config"
+        sudo systemctl restart docker
+        driver=$(docker info --format '{{ .DriverStatus }}')
+        echo "Image store: $driver"
+        case "$driver" in
+          *io.containerd.snapshotter*) ;;
+          *) echo "::error::Docker did not switch to the containerd image store"; exit 1 ;;
+        esac

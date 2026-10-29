@@ -124,9 +124,16 @@ build-image: ##@ Build container images for amd64 and arm64 (IMAGE_TAG=<tag>, de
 	@echo "Built prometheus-api:$(IMAGE_TAG)-amd64 and prometheus-api:$(IMAGE_TAG)-arm64"
 
 LOCAL_IMAGE ?= prometheus_api:local
+# Registry build cache to import, as <image>:<tag>. Empty builds uncached
+CACHE_FROM ?=
+CACHE_FROM_FLAG :=
+ifneq ($(CACHE_FROM),)
+# Not inline in the recipe: the comma would split the arguments of $(if)
+CACHE_FROM_FLAG := --cache-from "type=registry,ref=$(CACHE_FROM)"
+endif
 
-build-local: ##@ Build a host-arch image into the local Docker store for the platform (LOCAL_IMAGE=<name:tag>, default: prometheus_api:local)
-	docker build $(CERTS_CONTEXT) -t "$(LOCAL_IMAGE)" .
+build-local: ##@ Build a host-arch image into the local Docker store for the platform (LOCAL_IMAGE=<name:tag>, default: prometheus_api:local; CACHE_FROM=<image:tag> to import a registry cache)
+	docker build $(CERTS_CONTEXT) $(CACHE_FROM_FLAG) -t "$(LOCAL_IMAGE)" .
 
 build-push: ##@ Build and push multi-arch image (IMAGE_REPO=<repo> [IMAGE_TAG=<tag>])
 ifndef IMAGE_REPO
