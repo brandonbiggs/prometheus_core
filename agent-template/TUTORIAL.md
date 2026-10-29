@@ -865,8 +865,10 @@ uv run pytest
 uv run ruff check .
 ```
 
-The starter tests cover the example skill's success and missing-input paths.
-As you implement your logic, give every input-validation branch and every
+The starter tests cover the example skill's success and missing-input paths,
+plus `test_build_app_loads_agent_card`, which builds the server without starting
+it, so a broken `agent_card.json` or workflow file fails the tests. As you
+implement your logic, give every input-validation branch and every
 distinct result shape its own test. To assert on emitted progress updates or
 artifacts, inspect `event_queue.enqueue_event` calls:
 
