@@ -741,8 +741,8 @@ jobs:
       NETWORK: ${{ matrix.network }}
       # Placeholders for the variables .env sets. config only interpolates them
       AGENT_SECRET: placeholder
-      LITELLM_MASTER_KEY: placeholder
       REDIS_PASSWORD: placeholder
+      LLM_CONFIG_PROFILE: anthropic
       # Set together for external mode, as the Makefile requires
       EXTERNAL_AGENT_HOST: ${{ matrix.host }}
       EXTERNAL_AGENT_PORT: ${{ matrix.port }}

@@ -37,7 +37,7 @@ def _make_agent() -> TEMPLATE_CLASSAgent:
 
 def test_build_app_loads_agent_card():
     # Builds the server as run() would, which loads agent_card.json and any
-    # workflows/, without starting it or registering with LiteLLM.
+    # workflows/, without starting it or registering it.
     agent = _make_agent()
 
     assert agent.build_app(register_on_startup=False) is not None

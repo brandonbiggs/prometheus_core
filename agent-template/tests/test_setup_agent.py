@@ -71,7 +71,6 @@ def test_select_platform_env_values_includes_identity_verification_keys(tmp_path
     platform_env.write_text(
         "AGENT_SECRET=shared-secret\n"
         "REDIS_PASSWORD=redis-pw\n"
-        "LITELLM_MASTER_KEY=sk-litellm\n"
         "USER_IDENTITY_PRIVATE_KEY=should-never-be-copied\n"
         "USER_IDENTITY_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----abc-----END PUBLIC KEY-----\n"
         "USER_IDENTITY_ISS=prometheus-platform\n"
@@ -92,9 +91,8 @@ def test_select_platform_env_values_includes_identity_verification_keys(tmp_path
 def test_select_platform_env_values_includes_llm_config_profile(tmp_path):
     """The platform's inference routing must carry over to a scaffolded agent.
 
-    prometheus_api defaults an unset LLM_CONFIG_PROFILE to `registry`, so a
-    generated agent that didn't inherit this would silently route through the
-    LiteLLM proxy even on a platform configured for a different profile. The
+    The template has no default LLM_CONFIG_PROFILE, so a generated agent that
+    didn't inherit it would fail to start. The
     template deliberately ships no MODEL_NAME -- the profile maps the semantic
     flavors the agent asks for in code onto concrete models."""
     platform_env = tmp_path / "platform.env"

@@ -15,7 +15,7 @@ User → Prometheus UI → Orchestrator (client-agent)
                             │
                             │  A2A JSON-RPC over HTTP
                             ▼
-                       Your Agent  ←─── LiteLLM (LLM calls)
+                       Your Agent  ───→ LLM provider (LLM_CONFIG_PROFILE)
                             │
                             └── Redis (state, artifact catalog)
 ```
@@ -299,7 +299,7 @@ This is where you replace the `TODO` placeholder with real work.
 
 ### Example A: Calling Claude
 
-**Prefer the built-in `LLMClient`.** It is async (`await`), routes through LiteLLM like the rest of the platform, and never blocks the event loop:
+**Prefer the built-in `LLMClient`.** It is async (`await`), uses the provider and models of your `LLM_CONFIG_PROFILE`, and never blocks the event loop:
 
 ```python
 class SummarizerAgent(PrometheusAgent):
@@ -320,7 +320,7 @@ class SummarizerAgent(PrometheusAgent):
 > agent runs on a single event loop. A blocking call — like the synchronous
 > `anthropic.Anthropic().messages.create(...)` — does not `await`, so while it
 > runs it freezes the whole loop: the keepalive heartbeat stops, streamed status
-> updates stop flushing, and the upstream (LiteLLM) connection can hit its
+> updates stop flushing, and the upstream (backend gateway) connection can hit its
 > socket-read timeout and tear down mid-task even though your agent is still
 > working. See "Don't block the event loop" below.
 
@@ -674,8 +674,8 @@ Gives the container a stable hostname (`my-agent`) on the shared network. Other 
     environment:
       AGENT_PORT: 8000
       AGENT_SECRET: ${AGENT_SECRET}
-      REGISTRY_URL: ${REGISTRY_URL:-}
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      REGISTRY_URL: ${REGISTRY_URL:-http://backend:8000}
+      LITELLM_MASTER_KEY: ${AGENT_SECRET}   # the SDK's name for the registry token
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
 ```
@@ -895,16 +895,16 @@ Once your agent works locally, deploying it means connecting it to a running Pro
 
 ### What happens at startup
 
-When your container starts, `PrometheusAgent.run()` calls `register_with_registry_async()`. This sends a POST request to `REGISTRY_URL` (the LiteLLM proxy) advertising your agent's name, URL, and skills. The orchestrator polls LiteLLM's agent list and starts routing requests to you.
+When your container starts, `PrometheusAgent.run()` calls `register_with_registry_async()`. This sends a POST request to `REGISTRY_URL` (the platform backend's agent registry) advertising your agent's name, URL, and skills. The orchestrator polls the backend's agent list and starts routing requests to you.
 
-Registration retries with exponential backoff (default: 10 attempts, up to 30 seconds between tries), so the order in which containers start does not matter — your agent will wait for LiteLLM to become available.
+Registration retries with exponential backoff (default: 10 attempts, up to 30 seconds between tries), so the order in which containers start does not matter — your agent will wait for the backend to become available.
 
 ### External repository deployment
 
 1. Make sure the platform is running (`make up` from `platform/`).
-2. Fill in your `.env` with the same `AGENT_SECRET`, `LITELLM_MASTER_KEY`, `REDIS_PASSWORD`, and `REGISTRY_URL` values that the platform uses (copy from `platform/.env`).
+2. Fill in your `.env` with the same `AGENT_SECRET`, `REDIS_PASSWORD`, `LLM_CONFIG_PROFILE`, `LLM_API_KEY` and `DEEPLYNX_*` values that the platform uses (`python setup_agent.py --env-only <agent-dir>` copies them from `platform/.env`). In external mode, set `REGISTRY_URL=http://prometheus.host.internal:8600`.
 3. Start your agent: `make up`
-4. Verify registration: `curl -s http://localhost:9977/v1/agents | python -m json.tool` (replace `9977` with `LITELLM_LOCAL_PORT` from the platform's `.env`). Your agent's name should appear in the list.
+4. Verify registration: `curl -s -H "Authorization: Bearer $AGENT_SECRET" http://localhost:8600/v1/agents | python -m json.tool` (replace `8600` with `BACKEND_PORT` from the platform's `.env`). Your agent's name should appear in the list.
 
 If you need the agent to restart automatically when the platform does, add it to the platform team's infrastructure configuration or document the startup order for your deployment environment.
 
