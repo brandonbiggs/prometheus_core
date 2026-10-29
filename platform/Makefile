@@ -111,6 +111,23 @@ ifneq ($(wildcard docker-compose.override.yml),)
 COMPOSE_FILES_NG += -f docker-compose.override.yml
 endif
 
+# The builds of the sdk base image, backend and frontend import the registry
+# cache that publish-images writes. BUILD_CACHE is its prefix (one package per
+# image); a fork can point it at its own. The tag is the host's platform. The
+# agent images aren't published, so they build uncached. Importing a registry
+# cache needs the containerd image store (Docker Desktop's default). Set
+# USE_BUILD_CACHE=false (in .env or on the command line) to build without it,
+# e.g. when offline. Default: true.
+USE_BUILD_CACHE ?= true
+BUILD_CACHE ?= ghcr.io/idaholab/prometheus_core/buildcache-prometheus
+ifeq ($(USE_BUILD_CACHE),true)
+BUILD_CACHE_PLATFORM ?= $(if $(filter arm64 aarch64,$(shell uname -m)),arm64,amd64)
+export BUILD_CACHE
+export BUILD_CACHE_PLATFORM
+COMPOSE_FILES += -f docker-compose.build-cache.yml
+COMPOSE_FILES_NG += -f docker-compose.build-cache.yml
+endif
+
 CLEAR_COMPOSE_FILES ?= $(COMPOSE_FILES_NG)
 
 ##@
@@ -327,7 +344,8 @@ down-v: ##@ Stop all services and remove volumes
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) down -v
 
 base-image: ##@ Build the prometheus_api base image from ../sdk (automatic before builds when LOCAL_SDK=true)
-	$(MAKE) -C ../sdk build-local LOCAL_IMAGE=$(PROMETHEUS_API_BASE_IMAGE_REPO):$(PROMETHEUS_API_BASE_IMAGE_HASH)
+	$(MAKE) -C ../sdk build-local LOCAL_IMAGE=$(PROMETHEUS_API_BASE_IMAGE_REPO):$(PROMETHEUS_API_BASE_IMAGE_HASH) \
+		$(if $(filter true,$(USE_BUILD_CACHE)),CACHE_FROM=$(BUILD_CACHE)_sdk-devel:$(BUILD_CACHE_PLATFORM))
 
 build: ##@ Build images without starting
 build: $(BASE_IMAGE_DEP) generate

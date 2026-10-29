@@ -1,0 +1,26 @@
+# Reads the registry build cache that publish-images writes (build-image.yml).
+# One package per image, one tag per platform. The Makefile adds this file
+# unless USE_BUILD_CACHE=false, and sets BUILD_CACHE (the package prefix) and
+# BUILD_CACHE_PLATFORM (amd64 or arm64, from the host).
+#
+# The sdk base image the agents build FROM is built by `make base-image`, which
+# reads its cache from the same place (see CACHE_FROM in the base-image target).
+#
+# Importing a registry cache needs the containerd image store, or a buildx
+# builder that isn't the default docker driver.
+
+services:
+  backend:
+    build:
+      cache_from:
+        - type=registry,ref=${BUILD_CACHE:?set BUILD_CACHE}_backend-devel:${BUILD_CACHE_PLATFORM:?set BUILD_CACHE_PLATFORM}
+
+  frontend-dev:
+    build:
+      cache_from:
+        - type=registry,ref=${BUILD_CACHE:?set BUILD_CACHE}_frontend-devel:${BUILD_CACHE_PLATFORM:?set BUILD_CACHE_PLATFORM}
+
+  frontend-prod:
+    build:
+      cache_from:
+        - type=registry,ref=${BUILD_CACHE:?set BUILD_CACHE}_frontend-devel:${BUILD_CACHE_PLATFORM:?set BUILD_CACHE_PLATFORM}
