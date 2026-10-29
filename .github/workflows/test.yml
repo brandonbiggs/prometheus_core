@@ -81,7 +81,7 @@ jobs:
           python-version: "3.12"
       - name: Sync environment
         # Only the dev group, for each project's locked ruff version
-        run: uv sync --frozen --only-dev --no-install-package prometheus-api
+        run: uv sync --frozen --only-dev
       - name: Check
         run: uv run --frozen --no-sync ruff check --output-format=github .
       - name: Format
@@ -131,6 +131,19 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+  image-pins:
+    # Every Dockerfile FROM and compose image: is pinned by digest, so a tag
+    # can't silently move. Dependabot keeps the tag and digest current
+    name: "image pins"
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check
+        run: python3 platform/scripts/check_image_pins.py
 
   hadolint-shellcheck:
     # hadolint on every Dockerfile and shellcheck on every shell script, found
@@ -619,9 +632,7 @@ jobs:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
       - name: Sync environment
-        run: |
-          uv sync --frozen --no-install-package prometheus-api
-          uv pip install --no-deps ../../sdk
+        run: uv sync --frozen
       - name: Type check
         run: uv run --frozen --no-sync mypy app
       - name: Test
@@ -654,9 +665,7 @@ jobs:
           version: "0.11.25"
           python-version: "3.12"
       - name: Sync environment
-        run: |
-          uv sync --frozen --no-install-package prometheus-api
-          uv pip install --no-deps ../../sdk
+        run: uv sync --frozen
       - name: Test
         # Integration tests need the running platform. python -m puts the
         # current directory on sys.path, which the tests need to import system/
@@ -800,9 +809,7 @@ jobs:
         run: make up
       - name: Sync test environment
         working-directory: platform/tests
-        run: |
-          uv sync --frozen --no-install-package prometheus-api
-          uv pip install --no-deps ../../sdk
+        run: uv sync --frozen
       - name: Integration tests
         # Against the stack make up started: the tests find it running and use
         # it, with the credentials and ports in platform/.env
