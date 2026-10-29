@@ -141,6 +141,27 @@ Use a rule-specific `# noqa: E402`, never a bare `# noqa`. The same goes for
 - **Update in their own PRs.** Dependency bumps are separate from feature work.
   There's no automated updater yet (see [Open questions](#open-questions)).
 
+## Container images
+
+**Prioritize build caching.** Images are rebuilt constantly, and most rebuilds
+follow a change to one file. A Docker layer is rebuilt when its instruction or
+any file it reads changes, and so is every layer after it. Write Dockerfiles so
+that one change re-runs as little as possible:
+
+- **Order layers from least to most frequently changed:** system packages,
+  users, dependencies, then application code.
+- **Install dependencies in their own layer,** from the lockfile only
+  (`uv sync --locked` with `pyproject.toml` and `uv.lock` bind-mounted, or
+  `npm ci`), so a code change never reinstalls them.
+- **Copy only what the image uses.** Avoid `COPY . .`: an edit to a README
+  shouldn't rebuild anything.
+- **Give every build context a `.dockerignore`,** with patterns starting `**/`
+  (`**/__pycache__`); without it a pattern matches only at the context root.
+- **Share the uv cache mount** (`--mount=type=cache,id=prometheus-uv-cache,...`)
+  across images.
+- **Check it:** change one source file and rebuild. Only the layers from that
+  file's `COPY` onward should run again.
+
 ## Testing
 
 The PR-level rules (patch coverage, coverage floors, regression tests) are in

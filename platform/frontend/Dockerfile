@@ -25,14 +25,19 @@ RUN --mount=type=cache,id=prometheus-npm-cache,target=/root/.npm,sharing=locked 
 
 # ---- dev ----
 FROM deps AS dev
-COPY frontend/. .
+# No source COPY: docker-compose.yml bind-mounts ./frontend over /app (keeping the
+# image's node_modules), so source edits never need an image rebuild
 EXPOSE 5150
 ENV HOST=0.0.0.0
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5150"]
 
 # ---- build (prod) ----
 FROM deps AS build
-COPY frontend/. .
+# Only what `tsc && vite build` reads, so the README, nginx config and the like
+# don't invalidate the bundle. Config first, then the sources that change most.
+COPY frontend/tsconfig.json frontend/tsconfig.node.json frontend/vite.config.ts frontend/index.html ./
+COPY frontend/public ./public
+COPY frontend/src ./src
 RUN npm run build
 
 # ---- prod ----
