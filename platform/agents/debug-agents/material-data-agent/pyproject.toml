@@ -3,9 +3,7 @@ name = "data-agent"
 version = "0.1.0"
 description = "Material data retrieval agent"
 requires-python = ">=3.12"
-dependencies = [
-    "httpx>=0.26.0",
-]
+dependencies = []
 
 [tool.pytest.ini_options]
 # Async tests do not need @pytest.mark.asyncio.
