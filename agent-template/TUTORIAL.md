@@ -566,13 +566,13 @@ dependencies = [
 ]
 ```
 
-After editing `pyproject.toml`, sync your local environment:
+Add packages with `uv add`, which updates `pyproject.toml` and `uv.lock` and syncs your environment:
 
 ```bash
-uv pip install -r <(uv export --no-hashes)
-# or simply:
-uv pip install anthropic httpx   # for quick iteration
+uv add anthropic httpx
 ```
+
+If you edit `pyproject.toml` by hand, run `uv sync` afterwards. Commit `uv.lock` with `pyproject.toml`.
 
 ---
 
