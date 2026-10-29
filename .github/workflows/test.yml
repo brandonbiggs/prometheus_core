@@ -647,6 +647,52 @@ jobs:
           flag: backend
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  platform-backend-alembic:
+    # The unit tests run on in-memory SQLite, so this is the only place the
+    # models meet real Postgres and asyncpg outside the compose stack. Upgrades
+    # an empty database to head, then fails if the models differ from the
+    # migrated schema, such as a model change committed without a migration
+    name: "platform: backend alembic check"
+    needs: gitleaks
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: platform/backend
+    env:
+      ADMIN_DATABASE_URL: postgresql+asyncpg://admin:ci-test-password@localhost:5432/admin
+    services:
+      admin-db:
+        # The same image as admin-db in platform/docker-compose.yml
+        image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.11.25"
+          python-version: "3.12"
+      - name: Sync environment
+        run: uv sync --frozen
+      - name: Upgrade
+        run: uv run --frozen --no-sync alembic upgrade head
+      - name: Check
+        # Exits non-zero and prints the diff if the models have drifted
+        run: uv run --frozen --no-sync alembic check
+
   platform-infrastructure:
     name: "platform: infrastructure"
     needs: gitleaks
