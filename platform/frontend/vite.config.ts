@@ -44,6 +44,14 @@ export default defineConfig({
     include: ["mermaid"],
   },
   test: {
+    // Off by default; `npm run test:coverage` turns it on. Every source file
+    // counts, tested or not, so the total reflects the whole app
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/**/*.d.ts"],
+      reporter: ["text-summary", "json-summary", "cobertura"],
+    },
     // Logic tests (*.test.ts) run in Node; component tests (*.test.tsx) get a DOM
     projects: [
       {
