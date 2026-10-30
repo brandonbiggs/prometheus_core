@@ -1023,7 +1023,7 @@ jobs:
     # Skip the slow start when a compose file doesn't even parse
     needs: [gitleaks, platform-compose]
     runs-on: ubuntu-26.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: platform
@@ -1057,6 +1057,18 @@ jobs:
         # make up imports the registry build cache, which the default builder
         # can only do with this store
         uses: ./.github/actions/containerd-image-store
+      - name: Create .env
+        # Once .env exists, make loads it over the environment, and its blank
+        # DEEPLYNX_* lines would hide the stubs from every later start
+        run: |
+          make init-env
+          sed -i.bak \
+            -e "s|^DEEPLYNX_KEY=.*|DEEPLYNX_KEY=$DEEPLYNX_KEY|" \
+            -e "s|^DEEPLYNX_SECRET=.*|DEEPLYNX_SECRET=$DEEPLYNX_SECRET|" \
+            -e "s|^DEEPLYNX_ORG_ID=.*|DEEPLYNX_ORG_ID=$DEEPLYNX_ORG_ID|" \
+            -e "s|^DEEPLYNX_PROJECT_ID=.*|DEEPLYNX_PROJECT_ID=$DEEPLYNX_PROJECT_ID|" \
+            .env
+          rm .env.bak
       - name: Start
         # make up waits for every healthcheck, then runs make check: the
         # backend and frontend on their host ports, the frontend's /api proxy,
@@ -1068,6 +1080,35 @@ jobs:
       - name: Integration tests
         # Against the stack make up started: the tests find it running and use
         # it, with the credentials and ports in platform/.env
+        env:
+          UV_FROZEN: "1"
+          UV_NO_SYNC: "1"
+        run: make test-integration
+      # The other start targets, against the running stack. Each one except
+      # the -fg ones ends with make check. .env has every secret make up
+      # generated, so it has to stay as it is through all of them
+      - name: Save .env
+        run: cp .env "$RUNNER_TEMP/platform.env"
+      - name: Restart
+        run: |
+          make restart
+          diff "$RUNNER_TEMP/platform.env" .env
+      - name: Restart without regenerating
+        run: |
+          make ng-restart
+          diff "$RUNNER_TEMP/platform.env" .env
+      - name: Stop and restart
+        run: |
+          make down
+          make restart
+          diff "$RUNNER_TEMP/platform.env" .env
+      - name: Delete the volumes and start
+        run: |
+          make down-v
+          make up
+          diff "$RUNNER_TEMP/platform.env" .env
+      - name: Integration tests again
+        # Against the stack the last make up started, on empty volumes
         env:
           UV_FROZEN: "1"
           UV_NO_SYNC: "1"
