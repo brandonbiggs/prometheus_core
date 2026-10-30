@@ -1109,7 +1109,7 @@ jobs:
     # Skip the slow start when a compose file doesn't even parse
     needs: [gitleaks, platform-compose]
     runs-on: ubuntu-26.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: platform
@@ -1151,6 +1151,41 @@ jobs:
       - name: Integration tests
         # Against the stack make up started: the tests find it running and use
         # it, with the credentials and ports in platform/.env
+        env:
+          UV_FROZEN: "1"
+          UV_NO_SYNC: "1"
+        run: make test-integration
+      # The other start targets, against the running stack. Each one runs
+      # make deeplynx-setup again and, except the -fg ones, ends with make
+      # check. DeepLynx keeps its data until make down-v, so the key in .env
+      # has to survive every step before that, and a new one is saved after
+      - name: Save the DeepLynx settings
+        run: grep '^DEEPLYNX_' .env > "$RUNNER_TEMP/deeplynx.env"
+      - name: Restart
+        run: |
+          make restart
+          diff "$RUNNER_TEMP/deeplynx.env" <(grep '^DEEPLYNX_' .env)
+      - name: Restart without regenerating
+        run: |
+          make ng-restart
+          diff "$RUNNER_TEMP/deeplynx.env" <(grep '^DEEPLYNX_' .env)
+      - name: Stop and restart
+        # make down keeps the volumes, so DeepLynx still accepts the key
+        run: |
+          make down
+          make restart
+          diff "$RUNNER_TEMP/deeplynx.env" <(grep '^DEEPLYNX_' .env)
+      - name: Delete the volumes and start
+        # A fresh DeepLynx rejects the old key, so a new one is saved
+        run: |
+          make down-v
+          make up
+          if diff -q "$RUNNER_TEMP/deeplynx.env" <(grep '^DEEPLYNX_' .env) > /dev/null; then
+            echo "::error::make up kept the DeepLynx key from before make down-v"
+            exit 1
+          fi
+      - name: Integration tests again
+        # With the key make up saved after make down-v
         env:
           UV_FROZEN: "1"
           UV_NO_SYNC: "1"

@@ -42,7 +42,11 @@ The `platform: up deeplynx` job does the same with `LOCAL_DEEPLYNX=true`
 its published images, and `make deeplynx-setup` gives the services a real
 project and API key for it. `test_integration_deeplynx.py` then stores an item
 and a file through the backend's storage client and reads them back. Without
-the local DeepLynx those tests are skipped. Its logs are uploaded as
+the local DeepLynx those tests are skipped. The job then runs the other start
+targets against the stack (`make restart`, `make ng-restart`, `make down` then
+`make restart`, and `make down-v` then `make up`), checks that the DeepLynx
+settings in `.env` are kept until `make down-v` and replaced after it, and runs
+the integration tests again. Its logs are uploaded as
 `platform-up-deeplynx-logs`.
 
 ### No real LLM or DeepLynx credentials
