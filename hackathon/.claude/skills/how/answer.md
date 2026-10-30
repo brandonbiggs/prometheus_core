@@ -43,15 +43,15 @@ SEARCH IN THIS ORDER, stop at a cited answer:
    agents/debug-agents/*/, backend/app/, Makefile, docker-compose.yml, docs/docs/; the template:
    setup_agent.py, agent_template/.
 3. prometheus_api at the pin. Runner: docker exec <container> python -c "..." when it runs,
-   else docker run --rm containers.github.inl.gov/genesis/prometheus_api:<pin> python -c "...";
+   else run it in <platform>/../sdk with uv run python -c "..." (the monorepo's SDK source);
    skip when neither works. Version: import prometheus_api; print(prometheus_api.__version__).
    Find WORD: import pathlib, prometheus_api as p; r = pathlib.Path(p.__file__).parent;
    [print(f'{f.relative_to(r.parent)}:{i}: {l.rstrip()}') for f in sorted(r.rglob('*.py'))
    for i, l in enumerate(f.read_text().splitlines(), 1) if 'WORD' in l]. Source of one object:
    inspect.getsourcelines. The agent base class is prometheus_api/agent/base.py (not
-   storage_client/). Cite as prometheus_api/prometheus_api/agent/base.py:<line>.
-4. prometheus_api docs at the pin (docs/agent/, docs/ENV_SETUP.md, examples/, specs/): gh api "repos/genesis/prometheus_api/contents/<path>?ref=<pin>"
-   --hostname github.inl.gov -H "Accept: application/vnd.github.raw" | grep -n WORD.
+   storage_client/). Cite as sdk/prometheus_api/agent/base.py:<line>.
+4. SDK docs in the monorepo: <platform>/../sdk/docs/agent/, sdk/docs/, sdk/examples/, sdk/specs/
+   (grep -rn WORD).
 RETURN at most 40 lines:
 ANSWER: 2-5 sentences. EVIDENCE: - <repo-prefixed path>:<lines> - what it shows.
 SNIPPET: up to 15 verbatim lines with a citation, or none. SDK VERSION: version and source, or

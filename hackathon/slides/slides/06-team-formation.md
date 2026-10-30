@@ -172,9 +172,9 @@ Full card JSON for both skills and the implementation hints: this deck's appendi
 {widths="470px|"}
 | Make sure… | Because |
 |---|---|
-| **DeepLynx works** on your platform | without it your agent never sees the upload, and the PNG can't render |
+| **DeepLynx works** on your platform | agents won't start without it, never see the upload, and the PNG can't render |
 | **Team prefix** on the card name and skill IDs | every team builds the same skills; same names overwrite each other |
-| `matplotlib`, `pandas`… in `pyproject.toml`; `MPLBACKEND=Agg` | the base image has none of them, and there is no display |
+| `uv add matplotlib pandas`, commit `uv.lock`; `MPLBACKEND=Agg` | the base image has none of them, the build needs the lock, and there is no display |
 | `"streaming": true` in the card | so "Parsing 4 tables…" shows up live |
 | A **fresh conversation** per test | old uploads and results can mislead the orchestrator |
 
@@ -476,11 +476,10 @@ These go in the card's `skills` array, with `"capabilities": {"streaming": true}
 ```python {.sm}
 from prometheus_api.agent import MissingInput
 
-ctx = str(context.context_id)
 # df: the table loaded from params["table_artifact_id"]
 columns = list(df.columns)
-if not x_col or not y_cols:
-    self.save_context_state(ctx, {"table": table_id})
+x_col, y_col = params.get("x_column"), params.get("y_column")
+if not x_col or not y_col:
     await self.send_input_required(
         context, event_queue,
         missing_inputs=[
@@ -494,12 +493,12 @@ if not x_col or not y_cols:
             type="enum", options=columns)],
         hint="Choose the columns to plot.")
     return {}
-# resumed call: self.get_provided_inputs(context)
-#   → {"x_column": "...", "y_column": "..."} → y_columns=[...]
+# resumed call: the same params plus the answers,
+#   params["x_column"], params["y_column"]
 ```
 
 {.small}
-A string list in `options` becomes a dropdown in the chat's follow-up form, with your `hint` as the message. With `resolvable_from_context=False` (the default) the user is asked. If they type a reply instead, the orchestrator calls you again with new arguments.
+When the user answers, `_execute` runs again with the original arguments and the answers merged into `params`. A string list in `options` becomes a dropdown in the chat's follow-up form, with your `hint` as the message. With `resolvable_from_context=False` (the default) the user is asked. If they type a reply instead, the orchestrator calls you again with new arguments.
 :::
 
 ---
@@ -522,8 +521,8 @@ A string list in `options` becomes a dropdown in the chat's follow-up form, with
 {widths="420px|"}
 | Make sure… | Why |
 |---|---|
-| **DeepLynx is configured** on your platform (local or the shared instance) | Chat uploads are stored in DeepLynx and passed to agents as artifacts. Without it your agent never sees the file, and a PNG cannot render. {.hl} |
-| `matplotlib`, `pandas`… are in `pyproject.toml` | The base image has none of them. Set `MPLBACKEND=Agg` (no display in the container). |
+| **DeepLynx is configured** (your local instance, deck 03) in the platform's and your agent's `.env` | Every agent writes an execution record to DeepLynx, so it **won't start** without `DEEPLYNX_*`. Chat uploads are stored there too, and a PNG cannot render without it. {.hl} |
+| `matplotlib`, `pandas`… added with `uv add`, `uv.lock` committed | The base image has none of them, and the build stops without a current `uv.lock`. Set `MPLBACKEND=Agg` (no display in the container). |
 | Extra modules have `COPY` lines in the Dockerfile | The template copies only `agent.py`, the card, `prompts/`, and `workflows/`. |
 | Card name and skill IDs carry your **team prefix** | Every team builds an "extract table" skill. Same name → the registry replaces one agent with the other. |
 
@@ -535,7 +534,7 @@ A string list in `options` becomes a dropdown in the chat's follow-up form, with
 | Make sure… | Why |
 |---|---|
 | `"streaming": true` | So "Parsing 4 tables…" and "Plotting T \[K\] vs t \[min\]…" appear live |
-| Your LLM profile and its key are in `.env`; pick the flavor per call | `LLM_CONFIG_PROFILE=inl_litellm` (or `amsc`, `anl_asksage`) plus its key in `LLM_API_KEY`; `setup_agent.py` copies both from `platform/.env`. Attach `LITELLM_MASTER_KEY` only when `cfg.proxy_url` is set (the platform proxy). |
+| Your LLM profile and its key are in `.env`; pick the flavor per call | The platform's `LLM_CONFIG_PROFILE` (e.g. `anthropic`, `genesis`, `inl_litellm`) plus its key in `LLM_API_KEY`; `setup_agent.py` copies both from `platform/.env`. Then just `self.llm_client(context)`. |
 | Results stay small | Return the artifact ID, caption, and column names, not 10,000 rows. The data lives in the artifact. |
 | You test with a **fresh conversation** each time | Earlier uploads and results stay in the catalog and transcript the orchestrator LLM sees, and can make it pick the wrong file. |
 

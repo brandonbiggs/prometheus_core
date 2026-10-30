@@ -20,7 +20,9 @@ Find why something does not work, explain the cause, and fix it. The argument: `
    folders", "Find your agent"). Ask once for a missing path (header `Path`; add "Not cloned yet"
    for a setup check). Note `<agent>` and `<container>` (`grep -m1 'container_name:' <agent>/docker-compose.yml`).
    No agent: skip the agent checks, and say so.
-3. Read the ports: `grep -E '^(BACKEND_PORT|LITELLM_LOCAL_PORT|FRONTEND_DEV_PORT|FRONTEND_PROD_PORT|REDIS_LOCAL_PORT)=' <platform>/.env`.
+3. Read the ports: `grep -E '^(BACKEND_PORT|FRONTEND_DEV_PORT|FRONTEND_PROD_PORT|REDIS_LOCAL_PORT)=' <platform>/.env`.
+   The backend is the agent registry: `set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $AGENT_SECRET" localhost:<BACKEND_PORT>/v1/agents`.
+   There is no LiteLLM container and no port 9977.
 
 ## Rules
 
@@ -45,13 +47,23 @@ Find why something does not work, explain the cause, and fix it. The argument: `
    state the loss (`conventions.md`).
 3. **You**: give the steps, then ask (header `Done?`): "Done, check again", "Skip".
 
+## Newer failures (not yet in `troubleshooting.md`)
+
+| symptom | cause and fix |
+|---|---|
+| agent exits at startup: "Invalid required DeepLynx configuration" | every agent writes a DeepLynx execution record. Set `DEEPLYNX_JWT_TOKEN` or `DEEPLYNX_KEY` + `DEEPLYNX_SECRET`, plus `DEEPLYNX_ORG_ID` and `DEEPLYNX_PROJECT_ID`, in the agent `.env` (`python setup_agent.py --env-only <agent>` copies them from the platform; local DeepLynx: deck 03) |
+| `required variable LLM_CONFIG_PROFILE is missing a value` | no default any more and `registry` is not supported: copy the platform's profile (`--env-only`), or `make init-env` in the platform |
+| build stops: "uv.lock not found" or `--locked` fails | `uv sync` (or `uv lock`) in the agent folder, commit `uv.lock`, `make up` |
+| `LLMProviderError` / `LLMConfigError` / `LLMEndpointUnavailableError` | read the one-line message: provider HTTP status, unknown profile (it lists the installed ones), or an unreachable endpoint; check `LLM_API_KEY` for that profile |
+| agent registered, but not in `/agents` | old template defaults: `REGISTRY_URL` must be `http://backend:8000` (external mode `http://prometheus.host.internal:8600`) and compose must map `LITELLM_MASTER_KEY: ${AGENT_SECRET}` |
+
 ## Decide what to do
 
 Pick the task yourself from the request and the state; do not ask the user to name it.
 
 | when | file |
 |---|---|
-| an error or a symptom (a stack that won't start, an agent missing from `/agents`, a 401, `LLMAliasError`, uploads, plots, DeepLynx) | `fix-problem.md` |
+| an error or a symptom (a stack that won't start, an agent missing from `/agents`, a 401, `LLMProviderError`/`LLMConfigError`, `LLM_CONFIG_PROFILE` unset, "Invalid required DeepLynx configuration" at agent startup, a build that stops on `uv.lock`, uploads, plots, DeepLynx) | `fix-problem.md` |
 | the laptop, the homework, or the setup; or Day 1 has not started and no agent exists | `check-setup.md` |
 | what the orchestrator did, why the agent was not called, which arguments it sent; or a conversation id | `trace-turn.md` |
 

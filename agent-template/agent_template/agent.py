@@ -126,7 +126,7 @@ class TEMPLATE_CLASSAgent(PrometheusAgent):
     # PATTERNS — uncomment and adapt as needed.
     # ----------------------------------------------------------------------
     #
-    # Calling an LLM through the platform's LiteLLM gateway:
+    # Calling an LLM (provider and models come from LLM_CONFIG_PROFILE):
     #
     #     system_prompt = load_prompt("system_prompt.txt").format(input_data=input_data)
     #     async with self.llm_client(context) as llm:

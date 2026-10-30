@@ -150,8 +150,7 @@ DeepLynx file storage.
 | `AGENT_SECRET` | Shared bearer token for A2A auth. Must match the platform's. |
 | `AGENT_SECRET_REQUIRED` | Set `false` to disable auth — local development only. |
 | `AGENT_WORKFLOWS` | Optional workflow directory override. Defaults to `workflows` next to `agent_card.json`. |
-| `REGISTRY_URL` | LiteLLM proxy URL where the agent registers on startup. |
-| `LITELLM_MASTER_KEY` | LiteLLM gateway auth. |
+| `REGISTRY_URL` | Platform backend URL where the agent registers on startup (`http://backend:8000` in Docker). |
 | `REDIS_URL` / `REDIS_PASSWORD` | Conversation state and artifact registry. |
 | `PROMETHEUS_API_BASE_IMAGE_HASH` | Base image tag the Dockerfile builds from. |
 | `LOCAL_SDK` | `true` builds FROM the locally built `prometheus_api:local` instead of the registry. |

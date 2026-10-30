@@ -18,7 +18,7 @@
   <img src="assets/prometheus_logo.png" alt="Prometheus" style="width:560px; margin-left:-18px">
   <div class="kicker">Day 1 · 1:45 pm</div>
   <h1>Your local platform</h1>
-  <p class="sub">You started it at home. Now: what it runs for your agent, how to tell it is healthy, the LLM models it offers, DeepLynx for your files, and what to do when something is off.</p>
+  <p class="sub">You started it at home. Now: what it runs for your agent, how to tell it is healthy, which LLM profile it uses, your local DeepLynx, and what to do when something is off.</p>
   <div class="meta"><span class="pill acc">All participants</span><span class="pill">45 min</span><span class="pill">internals in the appendix</span></div>
 </section>
 
@@ -35,7 +35,7 @@
 <div class="card acc">
 <div class="kpi"><span class="v">2</span></div>
 <h3>Logged in</h3>
-<p class="small">An admin user and an active signing key.</p>
+<p class="small">An admin user. The signing key is created for you.</p>
 </div>
 
 <div class="card acc">
@@ -47,7 +47,7 @@
 <div class="card acc">
 <div class="kpi"><span class="v">4</span></div>
 <h3>Files work</h3>
-<p class="small">An upload lands in DeepLynx.</p>
+<p class="small">A local DeepLynx: agents won't start without it.</p>
 </div>
 
 </div>
@@ -76,18 +76,18 @@ Platform not starting yet? Work through the bonus slides at the end of this deck
 <td>test your agent like a user</td>
 </tr>
 <tr>
-<td><code>http://localhost:9977</code></td>
-<td>LiteLLM: the agent registry and the LLM gateway</td>
-<td>see registered agents and available models</td>
+<td><code>http://localhost:8600</code></td>
+<td>the backend: also the agent registry and gateway</td>
+<td>check health (<code>/healthz</code>), list registered agents (<code>/v1/agents</code>)</td>
 </tr>
 <tr>
-<td><code>http://localhost:8600</code></td>
-<td>the backend</td>
-<td>check health (<code>/healthz</code>)</td>
+<td><code>http://localhost:3000</code></td>
+<td>your local DeepLynx</td>
+<td>see uploads and result files</td>
 </tr>
 </tbody>
 </table>
-<p class="body">Behind them: the orchestrator (<code>client-agent</code>), three agents, a state store, and two databases. They talk to each other on the Docker network <code>prometheus_platform_agent-network</code>, which your agent joins too.</p>
+<p class="body">Behind them: the orchestrator (<code>client-agent</code>), two agents, a state store (Valkey), and the admin database. They talk to each other on the Docker network <code>prometheus_platform_agent-network</code>, which your agent joins too.</p>
   </div>
 </section>
 
@@ -100,7 +100,7 @@ Platform not starting yet? Work through the bonus slides at the end of this deck
 <span class="h">make init-env                  <span class="c"># once: creates .env (next slide)</span></span>
 <span class="h">echo <span class="s">&quot;LOCAL_SDK=true&quot;</span> &gt;&gt; .env  <span class="c"># once: base image from ../sdk</span></span>
 
-make up                        <span class="c"># build and start</span>
+make up                        <span class="c"># build, start, wait, make check</span>
 make restart                   <span class="c"># restart, no rebuild</span>
 make logs SERVICE=client-agent
 make down                      <span class="c"># stop</span></pre>
@@ -109,7 +109,7 @@ make down                      <span class="c"># stop</span></pre>
 <strong><code>LOCAL_SDK=true</code></strong>: every Python service is built <code>FROM</code> the <code>prometheus_api</code> base image. With this line, <code>make up</code> first builds that image from <code>../sdk</code> on your laptop (<code>prometheus_api:local</code>): no registry, no token. Without it, <code>make up</code> tries to pull from <code>containers.github.inl.gov</code> and fails with <code>unauthorized</code>. Put it in <code>.env</code> after <code>make init-env</code>, so every later <code>make up</code> sees it.</div>
 
 <div class="callout bad">
-<strong>Every <code>make up</code> or <code>make restart</code> empties the agent registry.</strong> The platform's own agents re-register by themselves. <strong>Your agent doesn't</strong>: restart it afterwards with <code>docker restart &lt;your-agent&gt;</code>.</div>
+<strong>Every <code>make up</code> or <code>make restart</code> empties the agent registry</strong> (<code>clear-agent-registry</code>). The platform's own agents re-register by themselves. <strong>Your agent doesn't</strong>: restart it afterwards with <code>docker restart &lt;your-agent&gt;</code>.</div>
 
 </div>
 </div>
@@ -122,22 +122,23 @@ make down                      <span class="c"># stop</span></pre>
   <div class="content">
 <pre class="xs">$ make init-env
 Created .env from .env.example.
-Generated in .env: AGENT_SECRET, REDIS_PASSWORD, LITELLM_MASTER_KEY, …
+Generated in .env: AGENT_SECRET, REDIS_PASSWORD, ADMIN_DB_PASSWORD, …
 
 <span class="h">Choose an LLM profile (up/down, Enter):</span>
-<span class="h">  registry     Default Prometheus deployment: route semantic aliases through the LiteLLM registry</span>
 <span class="h">  amsc         American Science Cloud OpenAI-compatible</span>
 <span class="h">  anl_asksage  ANL AskSage</span>
 <span class="h">&gt; anthropic    Anthropic</span>
+<span class="h">  genesis      American Science Cloud OpenAI-compatible</span>
 <span class="h">  inl_hpc      INL HPC OpenAI-compatible</span>
 <span class="h">  inl_litellm  INL LiteLLM proxy</span>
+<span class="h">  ollama       Inference provider configuration for a locally running ollama  [no key]</span>
 <span class="h">  openai       OpenAI</span>
 <span class="h">LLM_API_KEY for anthropic (input hidden):</span>
 Saved LLM_CONFIG_PROFILE=anthropic in .env.</pre>
 <div class="grid g3">
 <div class="card acc">
 <h3>Pick a profile</h3>
-<p class="small">Up/down arrows, then Enter. The brackets show the key each profile needs. The cursor starts on <code>registry</code>, the default.</p>
+<p class="small">Up/down arrows, then Enter. There is <strong>no default</strong>: you must pick one. <code>[no key]</code> (ollama) skips the key prompt.</p>
 </div>
 
 <div class="card acc">
@@ -152,19 +153,19 @@ Saved LLM_CONFIG_PROFILE=anthropic in .env.</pre>
 
 </div>
 
-<p class="small"><code>make up</code> runs the same step, so you get this menu there too if you skipped <code>make init-env</code>. It only appears in a terminal and only while the profile's key is empty; otherwise <code>make</code> stops with <code>[ERROR] … is empty in .env</code>.</p>
+<p class="small"><code>make up</code> runs the same step, so you get this menu there too if you skipped <code>make init-env</code>. It only appears in a terminal and only while the profile or its key is missing; otherwise <code>make</code> stops with <code>[ERROR] … is empty in .env</code>.</p>
   </div>
 </section>
 
 <section class="slide">
-  <div class="head"><div class="eyebrow">First login</div><h2>An admin user, then a signing key</h2></div>
+  <div class="head"><div class="eyebrow">First login</div><h2>An admin user, and you're in</h2></div>
   <div class="content">
 <div class="steps">
 <div class="step"><div><h4>Open <code>http://localhost:5150</code></h4>
 <p class="small">On first start a setup wizard asks for a username and password. Any local values work (not your INL login); the first user becomes admin.</p>
 </div></div>
-<div class="step"><div><h4>Admin › Signing Keys → generate, then activate</h4>
-<p class="small">The platform signs every chat turn with it, so agents know which user is asking.</p>
+<div class="step"><div><h4>Nothing to do for the signing key</h4>
+<p class="small">The backend creates and activates one on first start. It signs every chat turn, so agents know which user is asking. Admin › Signing Keys is only for rotating it.</p>
 </div></div>
 <div class="step"><div><h4>Type <code>/agents</code> in the chat</h4>
 <p class="small">You should see form-filler and synthesis (OSTI research only with <code>OPTIONAL_AGENTS=true</code>).</p>
@@ -172,7 +173,7 @@ Saved LLM_CONFIG_PROFILE=anthropic in .env.</pre>
 </div>
 
 <div class="callout warn">
-No active key → every chat turn fails with &quot;No 'userToken' found…&quot;.</div>
+Every chat turn fails with &quot;No 'userToken' found…&quot;? The backend could not create the key: check <code>ADMIN_DB_ENCRYPTION_KEY</code> in <code>.env</code> and <code>make logs SERVICE=backend</code>.</div>
 
   </div>
 </section>
@@ -180,18 +181,19 @@ No active key → every chat turn fails with &quot;No 'userToken' found…&quot;
 <section class="slide">
   <div class="head"><div class="eyebrow">Health checks</div><h2>Is it healthy?</h2></div>
   <div class="content">
-<pre class="sm">make ps                                     <span class="c"># all &quot;Up&quot;; most also &quot;(healthy)&quot;</span>
+<pre class="sm">make ps                                     <span class="c"># all &quot;Up&quot; and &quot;(healthy)&quot;</span>
 curl -s localhost:8600/healthz              <span class="c"># {&quot;status&quot;:&quot;ok&quot;}</span>
+make check                                  <span class="c"># every agent registered?</span>
 
-set -a; source .env; set +a                 <span class="c"># for the key below</span>
-curl -s -H <span class="s">&quot;Authorization: Bearer </span>$LITELLM_MASTER_KEY<span class="s">&quot;</span> <span class="s">\</span>
-     localhost:9977/v1/agents | python3 -m json.tool     <span class="c"># registered agents</span></pre>
+set -a; source .env; set +a                 <span class="c"># for the secret below</span>
+curl -s -H <span class="s">&quot;Authorization: Bearer </span>$AGENT_SECRET<span class="s">&quot;</span> <span class="s">\</span>
+     localhost:8600/v1/agents | python3 -m json.tool     <span class="c"># registered agents</span></pre>
 <div class="grid g2">
 <div class="callout">
 Then ask the chat something real, e.g. &quot;Extract the material, temperature and pressure from: SS316 pipe at 320 °C and 15 MPa&quot; (form-filler). Watch it with <code>make logs SERVICE=client-agent</code>.</div>
 
 <div class="callout warn">
-A 401 from LiteLLM means a missing or wrong <code>LITELLM_MASTER_KEY</code> header.</div>
+A 401 from <code>/v1/agents</code> means a missing or wrong <code>AGENT_SECRET</code> header.</div>
 
 </div>
 
@@ -237,7 +239,7 @@ A 401 from LiteLLM means a missing or wrong <code>LITELLM_MASTER_KEY</code> head
   <div class="content">
 <div class="grid" style="grid-template-columns: 1.45fr 1fr; gap:30px;">
 <div class="col">
-<p class="body">Your code asks for a <strong>flavor</strong> (<code>small</code>, <code>medium</code>, <code>large</code>, <code>vision</code>, <code>embedding</code>). One line in your agent's <code>.env</code> picks a <strong>profile</strong>: a provider plus the model behind each flavor.</p>
+<p class="body">Your code asks for a <strong>flavor</strong> (<code>small</code>, <code>medium</code>, <code>large</code>, <code>vision</code>, <code>embedding</code>). One line in <code>.env</code> picks a <strong>profile</strong>: a provider plus the model behind each flavor. <strong>It is required</strong>; there is no default.</p>
 <table class="t sm nw">
 <thead>
 <tr>
@@ -253,33 +255,39 @@ A 401 from LiteLLM means a missing or wrong <code>LITELLM_MASTER_KEY</code> head
 <td>your INL LiteLLM key</td>
 </tr>
 <tr>
-<td><code>amsc</code></td>
-<td>American Science Cloud</td>
-<td>your AMSC I2 key</td>
+<td><code>genesis</code></td>
+<td>Genesis MAG (American Science Cloud)</td>
+<td>your Genesis key</td>
 </tr>
 <tr>
-<td><code>anl_asksage</code></td>
-<td>ANL AskSage</td>
-<td>your AskSage static key</td>
+<td><code>anthropic</code> / <code>openai</code></td>
+<td>the vendor directly</td>
+<td>your vendor key</td>
+</tr>
+<tr>
+<td><code>ollama</code></td>
+<td>ollama on your laptop</td>
+<td>nothing (see note)</td>
 </tr>
 </tbody>
 </table>
-<p class="small">The profiles ship with the SDK in <code>sdk/prometheus_api/llm_configs/</code>, AskSage included; its embeddings use Voyage (<code>EMBEDDING_API_KEY</code>). Leave <code>LLM_CONFIG_PROFILE</code> unset and you get <code>registry</code>, which only defines <code>medium</code>: <code>small</code>, <code>large</code> and <code>vision</code> raise <code>LLMAliasError</code>. Pick one of these three.</p>
+<p class="small">All profiles (also <code>amsc</code>, <code>anl_asksage</code>, <code>inl_hpc</code>) ship with the SDK in <code>sdk/prometheus_api/llm_configs/</code>. Agents call the provider <strong>directly</strong>; there is no LLM proxy in the platform. For <code>ollama</code>, first name your models after the flavors: <code>ollama cp &lt;model&gt; default</code> (and <code>small</code>, <code>medium</code>, <code>large</code>, <code>vision</code>).</p>
 </div>
 <div class="col">
-<pre class="sm"># your agent&#x27;s .env: pick one
+<pre class="sm"># platform/.env (setup_agent.py copies
+# both into your agent&#x27;s .env)
 LLM_CONFIG_PROFILE=inl_litellm
 LLM_API_KEY=…
 
-# LLM_CONFIG_PROFILE=amsc
-# LLM_CONFIG_PROFILE=anl_asksage
+# LLM_CONFIG_PROFILE=genesis
+# LLM_CONFIG_PROFILE=ollama
 # (every profile reads LLM_API_KEY)</pre>
-<p class="small">Then <code>make up</code> in your agent's folder. Keys stay in <code>.env</code>, never in code or the repo.</p>
+<p class="small">Keys stay in <code>.env</code>, never in code or the repo. A wrong profile name stops with <code>LLMConfigError</code> listing the installed ones.</p>
 </div>
 </div>
 
   </div>
-  <aside class="notes">The template compose forwards LLM_API_KEY and EMBEDDING_API_KEY. Assumes LiteLLM trusts the INL certificate (registry profile); check before presenting.</aside>
+  <aside class="notes">The template compose forwards LLM_CONFIG_PROFILE, LLM_API_KEY and EMBEDDING_API_KEY; LLM_CONFIG_PROFILE has no default (compose stops with &quot;set LLM_CONFIG_PROFILE in .env&quot;). The old <code>registry</code> profile is rejected by make init-env.</aside>
 </section>
 
 <section class="slide">
@@ -297,308 +305,14 @@ LLM_API_KEY=…
 
 <ul class="b">
 <li>Every upload and every result file goes through DeepLynx, INL's data store.</li>
-<li><strong>Without it, your agent never sees uploads and a PNG cannot render.</strong></li>
-<li>Use the shared instance (<code>deeplynx.inl.gov</code>) or a local one (bonus slides). The settings are the <code>DEEPLYNX_*</code> lines in <code>.env</code>.</li>
+<li><strong>Every agent call writes an execution record there, so an agent without DeepLynx settings does not even start.</strong></li>
+<li>Everyone runs a <strong>local DeepLynx</strong> next to the platform (next three slides). The settings are the <code>DEEPLYNX_*</code> lines in <code>.env</code>.</li>
 </ul>
   </div>
 </section>
 
 <section class="slide">
-  <div class="head"><div class="eyebrow">DeepLynx</div><h2>Check that the platform can reach DeepLynx</h2></div>
-  <div class="content">
-<div class="col">
-<pre class="sm"><span class="c"># from inside the backend container (has DEEPLYNX_* env)</span>
-docker exec -i backend python - &lt;&lt;<span class="s">&#x27;EOF&#x27;</span>
-<span class="k">from</span> prometheus_api.storage_client <span class="k">import</span> (
-    ConnectionConfig, StorageClient)
-cfg = ConnectionConfig.from_env()
-<span class="k">with</span> StorageClient(cfg) <span class="k">as</span> c:
-    page = c.items.list(page_size=<span class="n">5</span>)
-    print(<span class="s">&quot;OK&quot;</span>, cfg.base_url, len(page.items), <span class="s">&quot;items&quot;</span>)
-EOF</pre>
-<p class="small">Then upload a file in the chat. It should appear in the DeepLynx UI under your project, and <code>/artifacts</code> lists it.</p>
-</div>
-
-  </div>
-</section>
-
-<section class="slide">
-  <div class="head"><div class="eyebrow">Something is off</div><h2>The problems you are most likely to hit</h2></div>
-  <div class="content">
-<table class="t sm">
-<thead>
-<tr>
-<th style="width:470px">Symptom</th>
-<th>Fix</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Every chat turn fails: &quot;No 'userToken' found…&quot;</td>
-<td>Admin › Signing Keys: generate and <strong>activate</strong> a key</td>
-</tr>
-<tr>
-<td>Your agent disappeared from <code>/agents</code></td>
-<td>the platform restarted: <code>docker restart &lt;your-agent&gt;</code></td>
-</tr>
-<tr>
-<td>LLM call gets HTTP 401</td>
-<td>the key for your <code>LLM_CONFIG_PROFILE</code> is missing or wrong in the agent's <code>.env</code></td>
-</tr>
-<tr>
-<td>&quot;Unknown LLM config profile&quot;</td>
-<td>a typo in <code>LLM_CONFIG_PROFILE</code>, or an SDK image without that profile</td>
-</tr>
-<tr>
-<td>&quot;DeepLynx storage is not configured&quot;</td>
-<td>set the <code>DEEPLYNX_*</code> lines, <code>make restart</code></td>
-</tr>
-<tr>
-<td>Backend fails: <code>password authentication failed for user &quot;admin&quot;</code></td>
-<td>a second platform checkout reuses the same Docker volumes: restore the old <code>ADMIN_DB_PASSWORD</code> and <code>ADMIN_DB_ENCRYPTION_KEY</code> in <code>.env</code>, or <code>make clobber</code> (deletes users, keys, and history)</td>
-</tr>
-<tr>
-<td>Something else</td>
-<td><code>make logs SERVICE=&lt;name&gt;</code>; the appendix has the full troubleshooting tables</td>
-</tr>
-</tbody>
-</table>
-  </div>
-</section>
-
-<section class="slide">
-  <div class="head"><div class="eyebrow">Checkpoint</div><h2>Before the break</h2></div>
-  <div class="content">
-<div class="grid g2" style="gap:30px;">
-<div class="col">
-<ul class="b check">
-<li>☐ <code>make ps</code>: all services up</li>
-<li>☐ <code>curl localhost:8600/healthz</code> → <code>{&quot;status&quot;:&quot;ok&quot;}</code></li>
-<li>☐ <code>/v1/agents</code> lists 4 agents (client + 3)</li>
-<li>☐ Logged in, signing key active</li>
-<li>☐ <code>/agents</code> in the chat works</li>
-<li>☐ A question gets an LLM answer</li>
-<li>☐ (optional) DeepLynx: an upload appears in the DeepLynx UI</li>
-</ul>
-</div>
-<div class="col">
-<div class="card acc">
-<h3>Stuck?</h3>
-<p class="body">Raise your hand now. Mentors fix environment problems during the break, so that at 2:45 pm everyone can follow the agent session with a running stack.</p>
-</div>
-
-<div class="card">
-<h3>Next: Building an agent (2:45 pm)</h3>
-<p class="body">The agent template is already in your clone (<code>prometheus_core/agent-template/</code>). Have <code>uv --version</code> working.</p>
-</div>
-
-</div>
-</div>
-
-  </div>
-</section>
-
-<section class="slide section bonus">
-  <div class="num">+</div>
-  <h2>Bonus: catch-up slides</h2>
-  <p class="lede">For participants whose platform does not start yet: prerequisites, clone, <code>.env</code> (with the local base image), startup failures, and a local DeepLynx.</p>
-</section>
-
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Prerequisites</div><h2>Before you clone</h2></div>
-  <div class="content">
-<table class="t">
-<thead>
-<tr>
-<th style="width:280px">Need</th>
-<th>Why / check</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Docker + Compose v2</strong></td>
-<td>The Makefile calls <code>docker compose -p prometheus_platform</code>. The compose files use <code>include:</code> and <code>additional_contexts</code>, so Compose ≥ 2.20 with BuildKit is needed. Check: <code>docker info</code>, <code>docker compose version</code>.</td>
-</tr>
-<tr>
-<td><strong>GNU make, git, python3</strong></td>
-<td><code>make up</code> runs <code>scripts/init_env.py</code> (standard library only) to create <code>.env</code>.</td>
-</tr>
-<tr>
-<td><strong><code>gh</code>, the GitHub CLI</strong></td>
-<td>Used for forks and PRs. <code>brew install gh</code> (needs admin), or copy the release binary from <code>github.com/cli/cli/releases</code> into <code>~/.local/bin</code>; then <code>gh auth login</code>.</td>
-</tr>
-<tr>
-<td><strong>The <code>prometheus_api</code> base image</strong></td>
-<td>Nothing to set up: <code>LOCAL_SDK=true</code> in <code>.env</code> builds it from <code>sdk/</code> on your laptop.</td>
-</tr>
-<tr>
-<td><strong>An LLM credential</strong></td>
-<td><code>LLM_API_KEY</code>: an Anthropic key for the bundled LiteLLM proxy, or the key for another profile (INL LiteLLM…).</td>
-</tr>
-<tr>
-<td><strong>uv + Python 3.12</strong></td>
-<td>Only for running things outside Docker: tests, a host-run agent, <code>setup_agent.py</code>. <code>uv --version</code></td>
-</tr>
-<tr>
-<td>Node.js 22 (optional)</td>
-<td>Only to run the frontend dev server on the host (<code>make react-dev</code>).</td>
-</tr>
-<tr>
-<td>Disk space</td>
-<td>Several GB for images. No minimum RAM is documented; if builds get killed, raise the Docker Desktop memory limit.</td>
-</tr>
-</tbody>
-</table>
-<p class="small">Podman: the template README mentions it, but the platform Makefile only drives <code>docker compose</code>. Use Docker Desktop (or Docker Engine) for the hackathon.</p>
-  </div>
-</section>
-
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Step 1</div><h2>Clone, and where the base image comes from</h2></div>
-  <div class="content">
-<div class="grid g2" style="gap:30px;">
-<pre class="sm"><span class="c"># your fork (see previous session), default branch devel</span>
-git clone git@github.com:<span class="p">&lt;you&gt;</span>/prometheus_core.git
-cd prometheus_core/platform     <span class="c"># the stack lives here</span>
-git remote add upstream <span class="s">\</span>
-  git@github.com:idaholab/prometheus_core.git
-git switch devel
-
-make init-env                 <span class="c"># creates .env, asks for LLM + key</span>
-echo <span class="s">&quot;LOCAL_SDK=true&quot;</span> &gt;&gt; .env   <span class="c"># base image from ../sdk</span></pre>
-<div class="col">
-<div class="card">
-<h4>Why a base image?</h4>
-<p class="small">Every Python service (backend, client-agent, all agents) is built <code>FROM</code> the <code>prometheus_api</code> image. With <code>LOCAL_SDK=true</code>, <code>make up</code> first builds it from <code>../sdk</code> as <code>prometheus_api:local</code>: no registry, no login, no VPN.</p>
-</div>
-
-<div class="callout warn">
-<code>LOCAL_SDK=true</code> builds whatever is in <code>sdk/</code> in your clone. After <code>git pull</code>, the next <code>make up</code> rebuilds it, so the SDK always matches the platform you pulled.</div>
-
-</div>
-</div>
-
-  </div>
-</section>
-
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Step 2 · in prometheus_core/platform</div><h2><code>.env</code>: <code>make up</code> writes it, you add one key</h2></div>
-  <div class="content">
-<div class="grid g32" style="gap:28px;">
-<table class="t sm">
-<thead>
-<tr>
-<th>In <code>.env</code></th>
-<th>Who sets it</th>
-</tr>
-</thead>
-<tbody>
-<tr class="hl">
-<td><code>LLM_API_KEY</code> (the key for your <code>LLM_CONFIG_PROFILE</code>)</td>
-<td><strong>you</strong>: the only value <code>make up</code> cannot generate</td>
-</tr>
-<tr class="hl">
-<td><code>LOCAL_SDK=true</code></td>
-<td><strong>you</strong>: build the base image from <code>../sdk</code></td>
-</tr>
-<tr>
-<td><code>AGENT_SECRET</code>, <code>REDIS_PASSWORD</code>, <code>LITELLM_MASTER_KEY</code></td>
-<td>generated</td>
-</tr>
-<tr>
-<td><code>LITELLM_DB_PASSWORD</code>, <code>ADMIN_DB_PASSWORD</code></td>
-<td>generated</td>
-</tr>
-<tr>
-<td><code>BACKEND_JWT_SECRET</code></td>
-<td>generated (session-cookie signing key)</td>
-</tr>
-<tr>
-<td><code>ADMIN_DB_ENCRYPTION_KEY</code></td>
-<td>generated (Fernet key for admin-db)</td>
-</tr>
-<tr>
-<td><code>REDIS_URL</code>, <code>LITELLM_LOCAL_PORT=9977</code>, ports</td>
-<td>defaults from <code>.env.example</code>; keep them</td>
-</tr>
-</tbody>
-</table>
-<div class="col">
-<h4 class="acc">What <code>make init-env</code> does</h4>
-<p class="small"><code>scripts/init_env.py</code>, run by every <code>make up</code>/<code>restart</code>:</p>
-<ol class="b small">
-<li>copies <code>.env.example</code> to <code>.env</code> if there is none</li>
-<li>fills every <strong>blank</strong> secret; values already set are never touched</li>
-<li>if your profile's LLM key is empty: shows the profile menu and asks for the key (no terminal: stops with an error)</li>
-</ol>
-<p class="small"><code>setup_agent.py</code> later copies these secrets into your agent's <code>.env</code>.</p>
-<div class="callout bad">
-Never commit <code>.env</code>. Never paste it into chat or a PR. Back it up: losing <code>ADMIN_DB_ENCRYPTION_KEY</code> makes the admin-db's encrypted rows unreadable.</div>
-
-</div>
-</div>
-
-  </div>
-</section>
-
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Troubleshooting · 1</div><h2>The stack won't start</h2></div>
-  <div class="content">
-<table class="t sm">
-<thead>
-<tr>
-<th style="width:470px">Symptom</th>
-<th>Cause → fix</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>unauthorized</code>, <code>denied</code> or <code>invalid reference format</code> for the base image</td>
-<td><code>LOCAL_SDK=true</code> is missing from <code>.env</code>, so the build looks for an image registry. Add the line and run <code>make up</code> again.</td>
-</tr>
-<tr>
-<td><code>pull access denied for prometheus_api</code></td>
-<td><code>LOCAL_SDK=true</code> is set, but <code>docker compose</code> ran without make, so <code>prometheus_api:local</code> was never built. Run <code>make base-image</code>, or always go through <code>make up</code>.</td>
-</tr>
-<tr>
-<td><code>make up</code> stops: &quot;<code>LLM_API_KEY</code> is empty&quot;</td>
-<td>Set <code>LLM_API_KEY</code> to the key for your <code>LLM_CONFIG_PROFILE</code> in <code>.env</code> (or pick another profile), then <code>make up</code> again.</td>
-</tr>
-<tr>
-<td>Port is already allocated (5150, 8600, 9977, 6379)</td>
-<td>Another process or an old stack is using it. <code>make down</code>, or change <code>*_PORT</code> in <code>.env</code>.</td>
-</tr>
-<tr>
-<td>Backend exits: &quot;jwt_secret is not configured&quot;</td>
-<td><code>BACKEND_JWT_SECRET</code> is empty: you ran <code>docker compose</code> without make. Run <code>make init-env</code> (an old <code>CHAINLIT_AUTH_SECRET</code> is no longer read).</td>
-</tr>
-<tr>
-<td>Backend exits during an alembic step</td>
-<td>Migrations run in <code>backend/docker-entrypoint.sh</code> before uvicorn; <code>make logs SERVICE=backend</code>.</td>
-</tr>
-<tr>
-<td>SSL / certificate errors during <code>npm ci</code> or <code>pip</code> on the INL network</td>
-<td>TLS inspection. <code>certs/INL.pem</code> is checked in (PR #100); pull the latest <code>devel</code>. Python images get the bundle from the base image.</td>
-</tr>
-<tr>
-<td><code>network … has active endpoints</code> on <code>make up</code></td>
-<td>An external agent is still attached to <code>prometheus_platform_agent-network</code>. Stop it first (<code>make down</code> in the agent dir).</td>
-</tr>
-<tr>
-<td>Build killed / exit 137</td>
-<td>Out of memory. Raise the Docker Desktop memory limit. The heaviest image, the OSTI agent, is only built with <code>OPTIONAL_AGENTS=true</code>.</td>
-</tr>
-<tr>
-<td>Behind a corporate proxy: downloads time out</td>
-<td>Set <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code>/<code>NO_PROXY</code>. They are <strong>build</strong> args; add <code>backend,admin-db</code> and your agent names to <code>NO_PROXY</code>.</td>
-</tr>
-</tbody>
-</table>
-  </div>
-</section>
-
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Local DeepLynx · 1</div><h2>Clone, build, start</h2></div>
+  <div class="head"><div class="eyebrow">Local DeepLynx · 1</div><h2>Clone, build, start</h2></div>
   <div class="content">
 <div class="grid g2" style="gap:30px;">
 <div class="col">
@@ -668,8 +382,8 @@ docker compose up          <span class="c"># add -d to detach</span></pre>
   </div>
 </section>
 
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Local DeepLynx · 2</div><h2>Create a project at <code>http://localhost:3000</code></h2></div>
+<section class="slide">
+  <div class="head"><div class="eyebrow">Local DeepLynx · 2</div><h2>Create a project at <code>http://localhost:3000</code></h2></div>
   <div class="content">
 <div class="grid g3" style="gap:20px;">
 <div class="col">
@@ -689,8 +403,8 @@ docker compose up          <span class="c"># add -d to detach</span></pre>
   </div>
 </section>
 
-<section class="slide bonus">
-  <div class="head"><div class="eyebrow">Bonus · Local DeepLynx · 3</div><h2>Generate an API key and point the platform at it</h2></div>
+<section class="slide">
+  <div class="head"><div class="eyebrow">Local DeepLynx · 3</div><h2>Generate an API key and point the platform at it</h2></div>
   <div class="content">
 <div class="grid" style="grid-template-columns: 0.8fr 0.8fr 1.4fr; gap:22px;">
 <div class="col">
@@ -708,11 +422,309 @@ DEEPLYNX_SECRET=…
 DEEPLYNX_BASE_URL=http://prometheus.host.internal:5000/api/v1/
 DEEPLYNX_ORG_ID=1
 DEEPLYNX_PROJECT_ID=1</pre>
-<p class="small">Then <code>make restart</code>. Copy the same values into your agent's <code>.env</code> (<code>setup_agent.py</code> copies every <code>DEEPLYNX_*</code> for you).</p>
+<p class="small">Then <code>make restart</code>. <code>setup_agent.py</code> copies every <code>DEEPLYNX_*</code> into your agent's <code>.env</code>.</p>
 <p class="small">Agent running on the host (not in Docker)? Use <code>http://localhost:5000/api/v1</code>.</p>
 </div>
 </div>
 
+  </div>
+</section>
+
+<section class="slide">
+  <div class="head"><div class="eyebrow">DeepLynx</div><h2>Check that the platform can reach DeepLynx</h2></div>
+  <div class="content">
+<div class="col">
+<pre class="sm"><span class="c"># from inside the backend container (has DEEPLYNX_* env)</span>
+docker exec -i backend python - &lt;&lt;<span class="s">&#x27;EOF&#x27;</span>
+<span class="k">from</span> prometheus_api.storage_client <span class="k">import</span> (
+    ConnectionConfig, StorageClient)
+cfg = ConnectionConfig.from_env()
+<span class="k">with</span> StorageClient(cfg) <span class="k">as</span> c:
+    page = c.items.list(page_size=<span class="n">5</span>)
+    print(<span class="s">&quot;OK&quot;</span>, cfg.base_url, len(page.items), <span class="s">&quot;items&quot;</span>)
+EOF</pre>
+<p class="small">Then upload a file in the chat. It should appear in the DeepLynx UI under your project, and <code>/artifacts</code> lists it.</p>
+</div>
+
+  </div>
+</section>
+
+<section class="slide">
+  <div class="head"><div class="eyebrow">Something is off</div><h2>The problems you are most likely to hit</h2></div>
+  <div class="content">
+<table class="t sm">
+<thead>
+<tr>
+<th style="width:470px">Symptom</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent exits: &quot;Invalid required DeepLynx configuration: …&quot;</td>
+<td>set <code>DEEPLYNX_KEY</code> + <code>DEEPLYNX_SECRET</code>, <code>DEEPLYNX_ORG_ID</code>, <code>DEEPLYNX_PROJECT_ID</code> in its <code>.env</code></td>
+</tr>
+<tr>
+<td>Your agent disappeared from <code>/agents</code></td>
+<td>the platform restarted: <code>docker restart &lt;your-agent&gt;</code></td>
+</tr>
+<tr>
+<td>LLM call gets HTTP 401</td>
+<td>the key for your <code>LLM_CONFIG_PROFILE</code> is missing or wrong in the agent's <code>.env</code></td>
+</tr>
+<tr>
+<td><code>LLMConfigError</code> / &quot;set LLM_CONFIG_PROFILE in .env&quot;</td>
+<td>the profile is empty or misspelled; the message lists the installed ones</td>
+</tr>
+<tr>
+<td>&quot;DeepLynx storage is not configured&quot;</td>
+<td>set the <code>DEEPLYNX_*</code> lines, <code>make restart</code></td>
+</tr>
+<tr>
+<td>Backend fails: <code>password authentication failed for user &quot;admin&quot;</code></td>
+<td>a second platform checkout reuses the same Docker volumes: restore the old <code>ADMIN_DB_PASSWORD</code> and <code>ADMIN_DB_ENCRYPTION_KEY</code> in <code>.env</code>, or <code>make clobber</code> (deletes users, keys, and history)</td>
+</tr>
+<tr>
+<td>Something else</td>
+<td><code>make logs SERVICE=&lt;name&gt;</code>; the appendix has the full troubleshooting tables</td>
+</tr>
+</tbody>
+</table>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="head"><div class="eyebrow">Checkpoint</div><h2>Before the break</h2></div>
+  <div class="content">
+<div class="grid g2" style="gap:30px;">
+<div class="col">
+<ul class="b check">
+<li>☐ <code>make ps</code>: all services up</li>
+<li>☐ <code>curl localhost:8600/healthz</code> → <code>{&quot;status&quot;:&quot;ok&quot;}</code></li>
+<li>☐ <code>make check</code> passes: every agent registered</li>
+<li>☐ Logged in through the setup wizard</li>
+<li>☐ <code>/agents</code> in the chat works</li>
+<li>☐ A question gets an LLM answer</li>
+<li>☐ Local DeepLynx: an upload appears at <code>localhost:3000</code></li>
+</ul>
+</div>
+<div class="col">
+<div class="card acc">
+<h3>Stuck?</h3>
+<p class="body">Raise your hand now. Mentors fix environment problems during the break, so that at 2:45 pm everyone can follow the agent session with a running stack.</p>
+</div>
+
+<div class="card">
+<h3>Next: Building an agent (2:45 pm)</h3>
+<p class="body">The agent template is already in your clone (<code>prometheus_core/agent-template/</code>). Have <code>uv --version</code> working.</p>
+</div>
+
+</div>
+</div>
+
+  </div>
+</section>
+
+<section class="slide section bonus">
+  <div class="num">+</div>
+  <h2>Bonus: catch-up slides</h2>
+  <p class="lede">For participants whose platform does not start yet: prerequisites, clone, <code>.env</code> (with the local base image), and startup failures.</p>
+</section>
+
+<section class="slide bonus">
+  <div class="head"><div class="eyebrow">Bonus · Prerequisites</div><h2>Before you clone</h2></div>
+  <div class="content">
+<table class="t">
+<thead>
+<tr>
+<th style="width:280px">Need</th>
+<th>Why / check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Docker + Compose v2</strong></td>
+<td>The Makefile calls <code>docker compose -p prometheus_platform</code>. The compose files use <code>include:</code> and <code>additional_contexts</code>, so Compose ≥ 2.20 with BuildKit is needed. Check: <code>docker info</code>, <code>docker compose version</code>.</td>
+</tr>
+<tr>
+<td><strong>GNU make, git, python3</strong></td>
+<td><code>make up</code> runs <code>scripts/init_env.py</code> (standard library only) to create <code>.env</code>.</td>
+</tr>
+<tr>
+<td><strong><code>gh</code>, the GitHub CLI</strong></td>
+<td>Used for forks and PRs. <code>brew install gh</code> (needs admin), or copy the release binary from <code>github.com/cli/cli/releases</code> into <code>~/.local/bin</code>; then <code>gh auth login</code>.</td>
+</tr>
+<tr>
+<td><strong>The <code>prometheus_api</code> base image</strong></td>
+<td>Nothing to set up: <code>LOCAL_SDK=true</code> in <code>.env</code> builds it from <code>sdk/</code> on your laptop.</td>
+</tr>
+<tr>
+<td><strong>An LLM credential</strong></td>
+<td><code>LLM_API_KEY</code> for the profile you pick (INL LiteLLM, Genesis, Anthropic…), or a local ollama.</td>
+</tr>
+<tr>
+<td><strong>A local DeepLynx</strong></td>
+<td>Required: agents don't start without it. Set up in this deck (Local DeepLynx · 1–3).</td>
+</tr>
+<tr>
+<td><strong>uv + Python 3.12</strong></td>
+<td>Only for running things outside Docker: tests, a host-run agent, <code>setup_agent.py</code>. <code>uv --version</code></td>
+</tr>
+<tr>
+<td>Node.js 22 (optional)</td>
+<td>Only to run the frontend dev server on the host (<code>make react-dev</code>).</td>
+</tr>
+<tr>
+<td>Disk space</td>
+<td>Several GB for images. No minimum RAM is documented; if builds get killed, raise the Docker Desktop memory limit.</td>
+</tr>
+</tbody>
+</table>
+<p class="small">Podman: the template README mentions it, but the platform Makefile only drives <code>docker compose</code>. Use Docker Desktop (or Docker Engine) for the hackathon.</p>
+  </div>
+</section>
+
+<section class="slide bonus">
+  <div class="head"><div class="eyebrow">Bonus · Step 1</div><h2>Clone, and where the base image comes from</h2></div>
+  <div class="content">
+<div class="grid g2" style="gap:30px;">
+<pre class="sm"><span class="c"># your fork (see previous session), default branch devel</span>
+git clone git@github.com:<span class="p">&lt;you&gt;</span>/prometheus_core.git
+cd prometheus_core/platform     <span class="c"># the stack lives here</span>
+git remote add upstream <span class="s">\</span>
+  git@github.com:idaholab/prometheus_core.git
+git switch devel
+
+make init-env                 <span class="c"># creates .env, asks for LLM + key</span>
+echo <span class="s">&quot;LOCAL_SDK=true&quot;</span> &gt;&gt; .env   <span class="c"># base image from ../sdk</span></pre>
+<div class="col">
+<div class="card">
+<h4>Why a base image?</h4>
+<p class="small">Every Python service (backend, client-agent, all agents) is built <code>FROM</code> the <code>prometheus_api</code> image. With <code>LOCAL_SDK=true</code>, <code>make up</code> first builds it from <code>../sdk</code> as <code>prometheus_api:local</code>: no registry, no login, no VPN.</p>
+</div>
+
+<div class="callout warn">
+<code>LOCAL_SDK=true</code> builds whatever is in <code>sdk/</code> in your clone. After <code>git pull</code>, the next <code>make up</code> rebuilds it, so the SDK always matches the platform you pulled.</div>
+
+</div>
+</div>
+
+  </div>
+</section>
+
+<section class="slide bonus">
+  <div class="head"><div class="eyebrow">Bonus · Step 2 · in prometheus_core/platform</div><h2><code>.env</code>: <code>make up</code> writes it, you add one key</h2></div>
+  <div class="content">
+<div class="grid g32" style="gap:28px;">
+<table class="t sm">
+<thead>
+<tr>
+<th>In <code>.env</code></th>
+<th>Who sets it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="hl">
+<td><code>LLM_CONFIG_PROFILE</code> + <code>LLM_API_KEY</code></td>
+<td><strong>you</strong>: <code>make up</code> asks for both</td>
+</tr>
+<tr class="hl">
+<td><code>LOCAL_SDK=true</code></td>
+<td><strong>you</strong>: build the base image from <code>../sdk</code></td>
+</tr>
+<tr class="hl">
+<td><code>DEEPLYNX_*</code> (key, secret, org, project, URL)</td>
+<td><strong>you</strong>: from your local DeepLynx</td>
+</tr>
+<tr>
+<td><code>AGENT_SECRET</code>, <code>REDIS_PASSWORD</code>, <code>ADMIN_DB_PASSWORD</code></td>
+<td>generated</td>
+</tr>
+<tr>
+<td><code>BACKEND_JWT_SECRET</code></td>
+<td>generated (session-cookie signing key)</td>
+</tr>
+<tr>
+<td><code>ADMIN_DB_ENCRYPTION_KEY</code></td>
+<td>generated (Fernet key for admin-db)</td>
+</tr>
+<tr>
+<td><code>REDIS_URL</code>, <code>BACKEND_PORT=8600</code>, ports</td>
+<td>defaults from <code>.env.example</code>; keep them</td>
+</tr>
+</tbody>
+</table>
+<div class="col">
+<h4 class="acc">What <code>make init-env</code> does</h4>
+<p class="small"><code>scripts/init_env.py</code>, run by every <code>make up</code>/<code>restart</code>:</p>
+<ol class="b small">
+<li>copies <code>.env.example</code> to <code>.env</code> if there is none</li>
+<li>fills every <strong>blank</strong> secret; values already set are never touched</li>
+<li>if the profile or its key is empty: shows the profile menu and asks for the key (no terminal: stops with an error)</li>
+</ol>
+<p class="small"><code>setup_agent.py</code> later copies these secrets into your agent's <code>.env</code>.</p>
+<div class="callout bad">
+Never commit <code>.env</code>. Never paste it into chat or a PR. Back it up: losing <code>ADMIN_DB_ENCRYPTION_KEY</code> makes the admin-db's encrypted rows unreadable.</div>
+
+</div>
+</div>
+
+  </div>
+</section>
+
+<section class="slide bonus">
+  <div class="head"><div class="eyebrow">Bonus · Troubleshooting · 1</div><h2>The stack won't start</h2></div>
+  <div class="content">
+<table class="t sm">
+<thead>
+<tr>
+<th style="width:470px">Symptom</th>
+<th>Cause → fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>unauthorized</code>, <code>denied</code> or <code>invalid reference format</code> for the base image</td>
+<td><code>LOCAL_SDK=true</code> is missing from <code>.env</code>, so the build looks for an image registry. Add the line and run <code>make up</code> again.</td>
+</tr>
+<tr>
+<td><code>pull access denied for prometheus_api</code></td>
+<td><code>LOCAL_SDK=true</code> is set, but <code>docker compose</code> ran without make, so <code>prometheus_api:local</code> was never built. Run <code>make base-image</code>, or always go through <code>make up</code>.</td>
+</tr>
+<tr>
+<td><code>make up</code> stops: &quot;<code>LLM_API_KEY</code> is empty&quot; or &quot;<code>LLM_CONFIG_PROFILE=registry</code> … is not supported&quot;</td>
+<td>Set <code>LLM_CONFIG_PROFILE</code> and its <code>LLM_API_KEY</code> in <code>.env</code> (or blank the profile and rerun <code>make up</code> for the menu).</td>
+</tr>
+<tr>
+<td>Port is already allocated (5150, 8600, 6379, 3000)</td>
+<td>Another process or an old stack is using it. <code>make down</code>, or change <code>*_PORT</code> in <code>.env</code>.</td>
+</tr>
+<tr>
+<td>Backend exits: &quot;jwt_secret is not configured&quot;</td>
+<td><code>BACKEND_JWT_SECRET</code> is empty: you ran <code>docker compose</code> without make. Run <code>make init-env</code> (an old <code>CHAINLIT_AUTH_SECRET</code> is no longer read).</td>
+</tr>
+<tr>
+<td>Backend exits during an alembic step</td>
+<td>Migrations run in <code>backend/docker-entrypoint.sh</code> before uvicorn; <code>make logs SERVICE=backend</code>.</td>
+</tr>
+<tr>
+<td>SSL / certificate errors during <code>npm ci</code> or <code>pip</code> on the INL network</td>
+<td>TLS inspection. The INL bundle is checked in under <code>common/certs/</code>; pull the latest <code>devel</code>. Extra CAs: drop a <code>*.pem</code> there.</td>
+</tr>
+<tr>
+<td><code>network … has active endpoints</code> on <code>make up</code></td>
+<td>An external agent is still attached to <code>prometheus_platform_agent-network</code>. Stop it first (<code>make down</code> in the agent dir).</td>
+</tr>
+<tr>
+<td>Build killed / exit 137</td>
+<td>Out of memory. Raise the Docker Desktop memory limit. The heaviest image, the OSTI agent, is only built with <code>OPTIONAL_AGENTS=true</code>.</td>
+</tr>
+<tr>
+<td>Behind a corporate proxy: downloads time out</td>
+<td>Set <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code>/<code>NO_PROXY</code>. They are <strong>build</strong> args; add <code>backend,admin-db</code> and your agent names to <code>NO_PROXY</code>.</td>
+</tr>
+</tbody>
+</table>
   </div>
 </section>
 
@@ -731,11 +743,11 @@ DEEPLYNX_PROJECT_ID=1</pre>
 <div class="step"><div><h4>Know what is running</h4>
 <p class="small">Every container, its port, and what <code>make up</code> really does.</p>
 </div></div>
-<div class="step"><div><h4>Are logged in, with a signing key</h4>
-<p class="small">The setup wizard's admin, plus an active key so agents accept your requests.</p>
+<div class="step"><div><h4>Are logged in</h4>
+<p class="small">The setup wizard's admin; the backend has already activated a signing key so agents accept your requests.</p>
 </div></div>
 <div class="step"><div><h4>Get an answer</h4>
-<p class="small"><code>/agents</code> lists the agents, and a question goes through the LLM proxy.</p>
+<p class="small"><code>/agents</code> lists the agents, and a question reaches the provider of your LLM profile.</p>
 </div></div>
 <div class="step"><div><h4>Can upload a file</h4>
 <p class="small">It lands in DeepLynx and agents can read it.</p>
@@ -791,13 +803,8 @@ Platform not starting yet? Use the <strong>bonus slides</strong> at the end of t
 </tr>
 <tr>
 <td><code>http://localhost:8600</code></td>
-<td>Backend (FastAPI)</td>
+<td>Backend (FastAPI): API, agent registry, A2A gateway</td>
 <td><code>BACKEND_PORT</code></td>
-</tr>
-<tr>
-<td><code>http://localhost:9977</code></td>
-<td>LiteLLM: registry, gateway, proxy</td>
-<td><code>LITELLM_LOCAL_PORT</code></td>
 </tr>
 <tr>
 <td><code>localhost:6379</code></td>
@@ -818,9 +825,8 @@ Platform not starting yet? Use the <strong>bonus slides</strong> at the end of t
 </table>
 <div class="col">
 <p class="body">Everything else stays <strong>inside</strong> the Docker network <code>prometheus_platform_agent-network</code> and is reached by service name:</p>
-<pre class="sm">http://litellm:4000        <span class="c"># or litellm-proxy:4000</span>
+<pre class="sm">http://backend:8000        <span class="c"># registry (REGISTRY_URL), JWKS</span>
 redis://redis:6379
-http://backend:8000        <span class="c"># JWKS for agents</span>
 http://client-agent:8000
 http://<span class="p">&lt;agent-service&gt;</span>:8000</pre>
 <div class="callout">
@@ -857,8 +863,8 @@ A port is already taken, for example by a local Redis on 6379? Change the variab
 </tr>
 <tr>
 <td><code>LLM_CONFIG_PROFILE</code></td>
-<td><code>registry</code></td>
-<td>Which flavor→model map agents use</td>
+<td><strong>none: required</strong></td>
+<td>Which provider and flavor→model map agents use</td>
 </tr>
 <tr>
 <td><code>LLM_CONFIG_FILE</code></td>
@@ -873,7 +879,7 @@ A port is already taken, for example by a local Redis on 6379? Change the variab
 <tr>
 <td><code>EMBEDDING_API_KEY</code></td>
 <td>empty</td>
-<td>Embeddings key for <code>anthropic</code>, <code>anl_asksage</code>, <code>registry</code></td>
+<td>Embeddings key for <code>anthropic</code>, <code>anl_asksage</code></td>
 </tr>
 <tr class="hl">
 <td><code>LOCAL_SDK</code></td>
@@ -882,8 +888,8 @@ A port is already taken, for example by a local Redis on 6379? Change the variab
 </tr>
 <tr>
 <td><code>DEEPLYNX_BASE_URL/KEY/SECRET/ORG_ID/PROJECT_ID</code></td>
-<td>commented</td>
-<td>Storage for uploads and <code>deeplynx://</code></td>
+<td>empty</td>
+<td><strong>Required</strong>: uploads, <code>deeplynx://</code>, execution records</td>
 </tr>
 <tr>
 <td><code>PROMETHEUS_MAX_UPLOAD_BYTES</code></td>
@@ -914,7 +920,7 @@ A port is already taken, for example by a local Redis on 6379? Change the variab
 <tr>
 <td><code>USER_IDENTITY_PRIVATE_KEY</code></td>
 <td>empty</td>
-<td>Backend fallback signing key (not in JWKS)</td>
+<td>Static signing key; set → no key is auto-created</td>
 </tr>
 <tr>
 <td><code>USER_IDENTITY_PUBLIC_KEY</code></td>
@@ -981,13 +987,14 @@ A port is already taken, for example by a local Redis on 6379? Change the variab
 <div class="arrow-h" style="width:30px"></div>
 <div class="box sky" style="flex:1"><strong>init-env</strong><span class="small"><code>.env</code> from the example, blank secrets filled, LLM key checked</span></div>
 <div class="arrow-h" style="width:30px"></div>
-<div class="box crimson" style="flex:1"><strong>clear-litellm-db</strong><span class="small"><code>compose down</code> + delete the <code>litellm-db-data</code> volume</span></div>
+<div class="box crimson" style="flex:1"><strong>clear-agent-registry</strong><span class="small"><code>compose down</code> + delete the registrations in Valkey</span></div>
 <div class="arrow-h" style="width:30px"></div>
-<div class="box green" style="flex:1"><strong>up --build -d</strong><span class="small">profile <code>dev</code>: all services + frontend-dev</span></div>
+<div class="box green" style="flex:1"><strong>up --build -d --wait</strong>, then <strong>check</strong><span class="small">profile <code>dev</code>: all services + frontend-dev; waits until all are healthy and registered</span></div>
 </div>
 
 <div class="grid g2" style="gap:26px;">
-<pre class="sm">make up                        <span class="c"># build + start, detached</span>
+<pre class="sm">make up                        <span class="c"># build + start, wait, check</span>
+make CHECK=false up            <span class="c"># skip the wait and check</span>
 make LOCAL_SDK=true up         <span class="c"># base image from ../sdk</span>
 make up-fg                     <span class="c"># same, logs in foreground</span>
 make DEBUG_AGENTS=true up      <span class="c"># + mock agents</span>
@@ -999,7 +1006,7 @@ make PROMETHEUS_SYSTEM_TESTING=true up  <span class="c"># :8001</span>
 make ps ; make logs SERVICE=client-agent</pre>
 <div class="col">
 <div class="callout bad">
-<strong><code>make up</code> and <code>make restart</code> wipe all agent registrations.</strong> Every run does a full <code>down</code> and deletes the LiteLLM DB. In-tree agents re-register because they restart too. An <strong>external agent</strong> (your template agent) must be restarted afterwards.</div>
+<strong><code>make up</code> and <code>make restart</code> wipe all agent registrations.</strong> Every run does a full <code>down</code> and deletes the registrations from Valkey. In-tree agents re-register because they restart too. An <strong>external agent</strong> (your template agent) must be restarted afterwards.</div>
 
 <p class="small"><code>restart</code> = the same without <code>--build</code>. <code>ng-up</code> / <code>ng-restart</code> skip regenerating the agents file. <code>docker-compose.override.yml</code> is picked up automatically if present (gitignored).</p>
 </div>
@@ -1111,6 +1118,10 @@ args:
 <td>runs as root, no <code>WORKDIR</code> (agents set <code>/app</code>)</td>
 </tr>
 <tr>
+<td>Used by</td>
+<td>client-agent and every agent; the backend now builds on its own image from <code>../sdk</code></td>
+</tr>
+<tr>
 <td><code>prometheus_api</code></td>
 <td>PrometheusAgent, LLMClient, StorageClient, identity, credentials, artifacts</td>
 </tr>
@@ -1124,11 +1135,11 @@ args:
 </tr>
 <tr>
 <td>LLM profiles</td>
-<td><code>registry</code>, <code>inl_hpc</code>, <code>inl_litellm</code>, <code>amsc</code>, <code>anthropic</code>, <code>openai</code></td>
+<td><code>anthropic</code>, <code>openai</code>, <code>genesis</code>, <code>ollama</code>, <code>amsc</code>, <code>anl_asksage</code>, <code>inl_hpc</code>, <code>inl_litellm</code> (<code>registry</code> exists but is rejected)</td>
 </tr>
 <tr>
 <td>INL TLS trust</td>
-<td><code>certs/INL.pem</code> (157 CAs, incl. the INL root)</td>
+<td><code>common/certs/</code> via the <code>certs</code> build context (INL bundle incl. the root)</td>
 </tr>
 <tr>
 <td>CLI</td>
@@ -1161,7 +1172,7 @@ args:
 </tr>
 <tr>
 <td><code>up</code> / <code>up-fg</code></td>
-<td>generate + key + wipe LiteLLM DB + <code>up --build</code></td>
+<td>generate + key + wipe registry + <code>up --build --wait</code> + <code>check</code></td>
 </tr>
 <tr>
 <td><code>restart</code> / <code>restart-fg</code></td>
@@ -1177,7 +1188,7 @@ args:
 </tr>
 <tr>
 <td><code>down-v</code></td>
-<td>stop and <strong>delete volumes</strong> (Valkey incl. sessions, both DBs, mesh cache, model caches)</td>
+<td>stop and <strong>delete volumes</strong> (Valkey incl. sessions, admin-db, mesh cache, model caches)</td>
 </tr>
 <tr>
 <td><code>build</code></td>
@@ -1202,8 +1213,12 @@ args:
 </thead>
 <tbody>
 <tr>
-<td><code>clear-litellm-db</code></td>
-<td>down + delete the LiteLLM volume</td>
+<td><code>clear-agent-registry</code></td>
+<td>down + delete the agent registrations in Valkey</td>
+</tr>
+<tr>
+<td><code>check</code></td>
+<td>wait until backend, frontend and every agent's registration answer</td>
 </tr>
 <tr>
 <td><code>clear-admin-users</code></td>
@@ -1211,7 +1226,7 @@ args:
 </tr>
 <tr>
 <td><code>clobber</code></td>
-<td>asks, then down + delete both DBs and Valkey (keeps caches)</td>
+<td>asks, then down + delete admin-db and Valkey (keeps caches)</td>
 </tr>
 <tr>
 <td><code>init-env</code></td>
@@ -1245,12 +1260,12 @@ args:
 </table>
 </div>
 
-<p class="small">Variables: <code>PROFILE</code> (dev | prod | empty), <code>DEBUG_AGENTS</code>, <code>OPTIONAL_AGENTS</code>, <code>PROMETHEUS_SYSTEM_TESTING</code>, <code>LOCAL_SDK</code>, <code>SERVICE</code>, <code>SKIP_PREREQUISITES=1</code>. The compose project name is <code>prometheus_platform</code>.</p>
+<p class="small">Variables: <code>PROFILE</code> (dev | prod | empty), <code>DEBUG_AGENTS</code>, <code>OPTIONAL_AGENTS</code>, <code>PROMETHEUS_SYSTEM_TESTING</code>, <code>LOCAL_SDK</code>, <code>SERVICE</code>, <code>CHECK=false</code>, <code>WAIT_TIMEOUT</code>, <code>CHECK_TIMEOUT</code>, <code>SKIP_PREREQUISITES=1</code>. The compose project name is <code>prometheus_platform</code>.</p>
   </div>
 </section>
 
 <section class="slide appendix">
-  <div class="head"><div class="eyebrow">First login</div><h2>Setup wizard, then a signing key</h2></div>
+  <div class="head"><div class="eyebrow">First login</div><h2>Setup wizard; the signing key is automatic</h2></div>
   <div class="content">
 <div class="grid g2" style="gap:30px;">
 <div class="col">
@@ -1258,8 +1273,8 @@ args:
 <div class="step"><div><h4>Open <code>http://localhost:5150</code></h4>
 <p class="small">On a fresh admin-db the <strong>setup wizard</strong> appears. Create the first user with any local username and password (not your INL login); it becomes <code>admin</code>. (The old <code>prometheus/prometheus</code> login in the README no longer exists.)</p>
 </div></div>
-<div class="step"><div><h4>Admin › Signing Keys</h4>
-<p class="small">Generate a key and <strong>activate</strong> it. From then on the backend mints an RS256 <code>userToken</code> for every chat turn and publishes the public key at <code>/.well-known/jwks.json</code>.</p>
+<div class="step"><div><h4>Signing key: already there</h4>
+<p class="small">On first start the backend generates and activates an RS256 key (stored encrypted with <code>ADMIN_DB_ENCRYPTION_KEY</code>). It mints a <code>userToken</code> for every chat turn and publishes the public key at <code>/.well-known/jwks.json</code>. Admin › Signing Keys is for rotation.</p>
 </div></div>
 <div class="step"><div><h4>Chat</h4>
 <p class="small">Try <code>/help</code>, <code>/agents</code>, <code>/workflows</code>, then ask a real question.</p>
@@ -1269,13 +1284,13 @@ args:
 </div>
 <div class="col">
 <div class="callout bad">
-<strong>Skip step 2 and every turn fails</strong> with &quot;No 'userToken' found in message metadata and USER_IDENTITY_REQUIRED=true&quot;. Agents require a user identity by default.</div>
+<strong>No key, and every turn fails</strong> with &quot;No 'userToken' found in message metadata and USER_IDENTITY_REQUIRED=true&quot;. The backend logs a warning when it could not create one, typically a missing or invalid <code>ADMIN_DB_ENCRYPTION_KEY</code>.</div>
 
 <div class="card">
 <h4>Alternative to the admin UI</h4>
 <ul class="b xs">
 <li>Local only: <code>USER_IDENTITY_REQUIRED=false</code> in <code>.env</code>, then <code>make restart</code>. Requests run as user <code>local</code>.</li>
-<li>Setting <code>USER_IDENTITY_PRIVATE_KEY</code> is <strong>not</strong> enough on the stock stack: agents verify through the backend's JWKS (<code>JWKS_URL</code>), which lists only keys stored in admin-db. Use the admin UI.</li>
+<li>Setting <code>USER_IDENTITY_PRIVATE_KEY</code> turns off the automatic key, and agents verify through the backend's JWKS (<code>JWKS_URL</code>), which lists only keys stored in admin-db. Leave it empty.</li>
 </ul>
 </div>
 
@@ -1287,30 +1302,27 @@ args:
 </section>
 
 <section class="slide appendix">
-  <div class="head"><div class="eyebrow">Health checks</div><h2>Check bottom-up: store → registry → backend → agents</h2></div>
+  <div class="head"><div class="eyebrow">Health checks</div><h2>Check bottom-up: store → backend → registry → agents</h2></div>
   <div class="content">
 <pre class="sm">source .env   <span class="c"># for the variables below</span>
 
-make ps                                                     <span class="c"># everything &quot;Up&quot;; litellm, dbs, backend &quot;(healthy)&quot;</span>
+make ps                                                     <span class="c"># everything &quot;Up (healthy)&quot;</span>
 docker exec agent-valkey valkey-cli -a <span class="s">&quot;</span>$REDIS_PASSWORD<span class="s">&quot;</span> ping  <span class="c"># → PONG</span>
-docker exec litellm-db pg_isready -U litellm                 <span class="c"># → accepting connections</span>
-docker exec admin-db   pg_isready -U admin
+docker exec admin-db pg_isready -U admin                     <span class="c"># → accepting connections</span>
 
-curl -s http://localhost:9977/health/liveliness               <span class="c"># → &quot;I&#x27;m alive!&quot;</span>
-curl -s -H <span class="s">&quot;Authorization: Bearer </span>$LITELLM_MASTER_KEY<span class="s">&quot;</span> <span class="s">\</span>
-     http://localhost:9977/v1/models                           <span class="c"># → {&quot;data&quot;:[{&quot;id&quot;:&quot;medium&quot;,…}]}</span>
-curl -s -H <span class="s">&quot;Authorization: Bearer </span>$LITELLM_MASTER_KEY<span class="s">&quot;</span> <span class="s">\</span>
-     http://localhost:9977/v1/agents | python3 -m json.tool    <span class="c"># → registered agents</span>
-
-curl -s http://localhost:8600/healthz                          <span class="c"># → {&quot;status&quot;:&quot;ok&quot;}</span>
-curl -s http://localhost:8600/.well-known/jwks.json            <span class="c"># → your active signing key</span>
+curl -s http://localhost:8600/healthz                          <span class="c"># → {&quot;status&quot;:&quot;ok&quot;}  (alive)</span>
+curl -s http://localhost:8600/readyz                           <span class="c"># → 200 once Valkey + admin-db answer</span>
+curl -s http://localhost:8600/.well-known/jwks.json            <span class="c"># → the active signing key</span>
+curl -s -H <span class="s">&quot;Authorization: Bearer </span>$AGENT_SECRET<span class="s">&quot;</span> <span class="s">\</span>
+     http://localhost:8600/v1/agents | python3 -m json.tool    <span class="c"># → registered agents</span>
+make check                                                     <span class="c"># all of the above, for every agent</span>
 
 docker exec client-agent python -c <span class="s">&quot;import urllib.request as u; \</span>
 <span class="s">  print(u.urlopen(&#x27;http://synthesis-agent:8000/healthz&#x27;).read())&quot;</span>   <span class="c"># → {&quot;ok&quot;: true, &quot;status&quot;: &quot;healthy&quot;, …}</span></pre>
 <div class="grid g3">
 <div class="card">
-<h4>401 from LiteLLM?</h4>
-<p class="small">Every LiteLLM route except health needs <code>Authorization: Bearer $LITELLM_MASTER_KEY</code>.</p>
+<h4>401 from <code>/v1/agents</code>?</h4>
+<p class="small">The registry and gateway routes need <code>Authorization: Bearer $AGENT_SECRET</code>.</p>
 </div>
 
 <div class="card">
@@ -1319,8 +1331,8 @@ docker exec client-agent python -c <span class="s">&quot;import urllib.request a
 </div>
 
 <div class="card">
-<h4>No agent healthchecks</h4>
-<p class="small">The agents and the client-agent have no Docker healthcheck (the backend does). &quot;Up&quot; only means started; check their logs.</p>
+<h4>Agent healthchecks</h4>
+<p class="small">Every agent has a Docker healthcheck on <code>/healthz</code> (<code>/health</code> is gone). &quot;healthy&quot; does not mean registered: <code>make check</code> tests that.</p>
 </div>
 
 </div>
@@ -1373,8 +1385,8 @@ docker exec client-agent python -c <span class="s">&quot;import urllib.request a
 <h4 class="acc">Watch it happen</h4>
 <pre class="sm">make logs SERVICE=client-agent
 make logs SERVICE=form-filler-agent
-make logs SERVICE=litellm</pre>
-<p class="small">In the client-agent log you see discovery (<code>GET /v1/agents</code>), each tool call the loop makes (status &quot;Next step: …&quot;), and the <code>/a2a/{agent}</code> call.</p>
+make logs SERVICE=backend</pre>
+<p class="small">In the client-agent log you see discovery (<code>GET backend:8000/v1/agents</code>), each tool call the loop makes (status &quot;Next step: …&quot;), and the <code>/a2a/{agent}</code> call through the backend.</p>
 <div class="callout">
 A newly registered agent reaches the orchestrator's tool list within about 60 s (the capability-cache TTL), immediately on a skill miss, or right after <code>docker restart client-agent</code>.</div>
 
@@ -1405,7 +1417,7 @@ A newly registered agent reaches the orchestrator's tool list within about 60 s 
 </tr>
 <tr>
 <td>corrosion-agent</td>
-<td><code>send_input_required</code> + context state</td>
+<td><code>send_input_required</code>; answers come back in <code>params</code></td>
 </tr>
 <tr>
 <td>thermal-agent</td>
@@ -1450,41 +1462,12 @@ These are the best working examples of every pattern in the template tutorial. R
 <p class="body">Agent code asks for a <strong>flavor</strong> (<code>llm.medium(…)</code>). The deployment chooses a <strong>profile</strong> that maps flavors to real models. Resolution order in <code>LLMConfig.from_env()</code>:</p>
 <ol class="b">
 <li><code>LLM_CONFIG_FILE</code>: a YAML path inside the container</li>
-<li><code>LLM_CONFIG_PROFILE</code>: an installed profile name</li>
-<li>otherwise <code>registry</code></li>
+<li><code>LLM_CONFIG_PROFILE</code>: an installed profile name (<code>list_llm_config_profiles()</code>)</li>
 </ol>
-<p class="small">The platform default is <code>registry</code>: <code>proxy_url: os.environ/REGISTRY_URL</code>, so every call goes to <strong>LiteLLM</strong> at <code>http://litellm:4000/v1/chat/completions</code> with <code>model=&lt;flavor&gt;</code>.</p>
+<p class="small">Each agent calls the provider's <code>api_base</code> <strong>directly</strong> with <code>LLM_API_KEY</code>. The platform no longer runs an LLM proxy, so the old <code>registry</code> profile (calls to <code>REGISTRY_URL</code>) is rejected by <code>make init-env</code>, and the platform compose stops if <code>LLM_CONFIG_PROFILE</code> is empty.</p>
 <div class="callout warn">
-With the default <code>registry</code> profile, flavors are looked up in the platform's LiteLLM proxy. Its <code>litellm_config.yaml</code> on <code>devel</code> currently defines only <code>medium</code> (→ <code>anthropic/claude-sonnet-4-6</code>). Add the other aliases there (right), or switch to a profile such as <code>inl_litellm</code>, which defines all six. A flavor with no model behind it raises <code>LLMAliasError</code>.</div>
+A flavor with no model behind it raises <code>LLMAliasError</code>; an unknown profile raises <code>LLMConfigError</code> with the list of installed ones; a provider error (bad key, quota) raises <code>LLMProviderError</code> with the status code and a one-line reason.</div>
 
-</div>
-
-  </div>
-</section>
-
-<section class="slide appendix">
-  <div class="head"><div class="eyebrow">LLM configuration for the deployment</div><h2>Adding flavors to the platform proxy</h2></div>
-  <div class="content">
-<div class="col">
-<pre class="sm"><span class="c"># prometheus_core/platform/litellm_config.yaml</span>
-model_list:
-  - model_name: medium
-    litellm_params:
-      model: anthropic/claude-sonnet-4-6
-      api_key: os.environ/LLM_API_KEY
-<span class="h">  - model_name: small</span>
-<span class="h">    litellm_params:</span>
-<span class="h">      model: anthropic/claude-haiku-4-5</span>
-<span class="h">      api_key: os.environ/LLM_API_KEY</span>
-<span class="h">  - model_name: default</span>
-<span class="h">    litellm_params:</span>
-<span class="h">      model: anthropic/claude-sonnet-4-6</span>
-<span class="h">      api_key: os.environ/LLM_API_KEY</span>
-<span class="h">  <span class="c"># …likewise large, vision, embedding</span></span>
-general_settings:   <span class="c"># unchanged</span>
-  master_key: <span class="s">&quot;os.environ/LITELLM_MASTER_KEY&quot;</span>
-  …</pre>
-<p class="small">Then <code>make restart</code> and check <code>curl -H &quot;Authorization: Bearer $LITELLM_MASTER_KEY&quot; localhost:9977/v1/models</code>. Model IDs are examples; use what your key can access.</p>
 </div>
 
   </div>
@@ -1504,16 +1487,22 @@ general_settings:   <span class="c"># unchanged</span>
 </thead>
 <tbody>
 <tr class="hl">
-<td><code>registry</code></td>
-<td>LiteLLM proxy at <code>$REGISTRY_URL</code></td>
-<td>proxy master key</td>
-<td>whatever <code>litellm_config.yaml</code> defines</td>
-</tr>
-<tr>
 <td><code>inl_litellm</code></td>
 <td><code>https://litellm.inl.gov/v1</code></td>
 <td>INL LiteLLM</td>
-<td>claude-sonnet-5-awsgov · sonnet-4-5 · sonnet-5 · opus-4-8 · opus-4-8 · text-embedding-3-large-gov-va</td>
+<td>claude-sonnet-5-5-awsgov ×3 · opus-5-5-awsgov · …</td>
+</tr>
+<tr>
+<td><code>genesis</code></td>
+<td><code>https://mag.genesis.americansciencecloud.org/v1</code></td>
+<td>Genesis</td>
+<td>claude-opus · haiku · sonnet · opus · …</td>
+</tr>
+<tr>
+<td><code>ollama</code></td>
+<td><code>http://host.docker.internal:11434/v1</code></td>
+<td>none</td>
+<td>your <code>ollama cp</code> aliases <code>default</code>, <code>small</code>, <code>medium</code>, <code>large</code>, <code>vision</code></td>
 </tr>
 <tr>
 <td><code>inl_hpc</code></td>
@@ -1523,15 +1512,15 @@ general_settings:   <span class="c"># unchanged</span>
 </tr>
 <tr>
 <td><code>anthropic</code></td>
-<td>direct</td>
+<td><code>https://api.anthropic.com/v1</code></td>
 <td>Anthropic (+ <code>EMBEDDING_API_KEY</code>)</td>
-<td>opus-5 · haiku-4-5 · sonnet-5 · fable-5 · opus-5 · voyage-4-large</td>
+<td>opus-5-5 · haiku-5-5 · sonnet-5-5 · opus-5-5 · opus-5-5 · voyage</td>
 </tr>
 <tr>
 <td><code>amsc</code></td>
-<td>American Science Cloud</td>
+<td>American Science Cloud I2</td>
 <td>AMSC I2</td>
-<td>sonnet · haiku · sonnet · opus · opus · ada-002</td>
+<td>sonnet · haiku · sonnet · opus · …</td>
 </tr>
 <tr>
 <td><code>anl_asksage</code></td>
@@ -1541,20 +1530,22 @@ general_settings:   <span class="c"># unchanged</span>
 </tr>
 <tr>
 <td><code>openai</code></td>
-<td>direct</td>
+<td><code>https://api.openai.com/v1</code></td>
 <td>OpenAI</td>
-<td>gpt-5.6-terra · 5.4-nano · 5.6-terra · 5.6-sol · 5.6-luna · text-embedding-3-large</td>
+<td>gpt-5.6-terra · 6-luna · 5.6-terra · 6.1-sol · 6-luna · …</td>
 </tr>
 </tbody>
 </table>
 <div class="grid g2">
-<pre class="sm"><span class="c"># .env: all platform agents talk to INL LiteLLM directly</span>
+<pre class="sm"><span class="c"># platform/.env: all platform agents switch</span>
 LLM_CONFIG_PROFILE=inl_litellm
 LLM_API_KEY=sk-…
-make restart</pre>
+make restart
+<span class="c"># your agent: same two lines in its .env</span>
+<span class="c"># (python setup_agent.py --env-only &lt;dir&gt;)</span></pre>
 <div class="col">
 <div class="callout">
-Setting <code>LLM_API_KEY</code> alone does <strong>not</strong> change routing; only the profile or file does. Installed profiles are scaffolds: the model IDs are replaceable. The next session covers custom YAML files and adding profiles.</div>
+Setting <code>LLM_API_KEY</code> alone does <strong>not</strong> change routing; only the profile or file does. Installed profiles are scaffolds: the model IDs are replaceable (columns: default · small · medium · large · vision). The next session covers custom YAML files.</div>
 
 </div>
 </div>
@@ -1565,7 +1556,7 @@ Setting <code>LLM_API_KEY</code> alone does <strong>not</strong> change routing;
 <section class="slide section appendix">
   <div class="num">DL</div>
   <h2>DeepLynx: the data layer</h2>
-  <p class="lede">What the platform stores there, and how to run your own instance next to the stack.</p>
+  <p class="lede">What the platform stores there, and why every agent needs it.</p>
 </section>
 
 <section class="slide appendix">
@@ -1582,6 +1573,10 @@ Setting <code>LLM_API_KEY</code> alone does <strong>not</strong> change routing;
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>every agent (SDK ≥ 0.15)</td>
+<td>an <strong>execution record</strong> per call (agent, user, task, redacted params); <code>self.execution_record_id</code></td>
+</tr>
 <tr>
 <td>client-agent</td>
 <td><strong>every user upload</strong> → stored, then registered as an artifact</td>
@@ -1612,7 +1607,7 @@ fs = fsspec.filesystem(<span class="s">&quot;deeplynx&quot;</span>,
 fs.get(<span class="s">&quot;deeplynx://organizations/1/projects/1/items/42&quot;</span>,
        <span class="s">&quot;/tmp/out/&quot;</span>)          <span class="c"># → /tmp/out/42</span></pre>
 <div class="callout warn">
-No DeepLynx configured → uploads show &quot;DeepLynx storage is not configured&quot; and are <strong>not</strong> passed to agents. Compose defaults to <code>https://deeplynx.inl.gov/api/v1</code>, which needs a key. A local instance is the easiest route for the hackathon.</div>
+No DeepLynx configured → agents exit at startup with &quot;Invalid required DeepLynx configuration: …&quot;, and uploads show &quot;DeepLynx storage is not configured&quot;. Use the local instance from the main talk.</div>
 
 </div>
 </div>
@@ -1641,8 +1636,8 @@ No DeepLynx configured → uploads show &quot;DeepLynx storage is not configured
 <td>Key and secret swapped, or the secret was not copied completely. Generate a new key.</td>
 </tr>
 <tr>
-<td><code>ValueError: invalid literal for int() with base 10: ''</code></td>
-<td><code>DEEPLYNX_ORG_ID</code> / <code>_PROJECT_ID</code> are empty (compose passes empty strings). Set them.</td>
+<td>&quot;Invalid required DeepLynx configuration: missing DEEPLYNX_ORG_ID…&quot;</td>
+<td><code>DEEPLYNX_ORG_ID</code> / <code>_PROJECT_ID</code> are empty. Set them; also set key + secret <strong>or</strong> <code>DEEPLYNX_JWT_TOKEN</code>, never both.</td>
 </tr>
 <tr>
 <td>&quot;Failed to get data source ID…&quot;</td>
@@ -1677,7 +1672,7 @@ No DeepLynx configured → uploads show &quot;DeepLynx storage is not configured
 <tbody>
 <tr>
 <td>Every turn fails: &quot;No 'userToken' found… USER_IDENTITY_REQUIRED=true&quot;</td>
-<td>No active signing key. Go to Admin › Signing Keys → generate + activate (or <code>USER_IDENTITY_REQUIRED=false</code>).</td>
+<td>The backend has no active signing key: <code>ADMIN_DB_ENCRYPTION_KEY</code> missing or invalid (see the backend log). Fix <code>.env</code>, <code>make restart</code> (or <code>USER_IDENTITY_REQUIRED=false</code>).</td>
 </tr>
 <tr>
 <td>&quot;userToken has expired&quot;</td>
@@ -1685,11 +1680,11 @@ No DeepLynx configured → uploads show &quot;DeepLynx storage is not configured
 </tr>
 <tr>
 <td><code>LLMAliasError</code>: alias 'small' not available</td>
-<td>The active profile has no model for that flavor. Under <code>registry</code>, add the alias to <code>litellm_config.yaml</code> and <code>make restart</code>, or switch <code>LLM_CONFIG_PROFILE</code>.</td>
+<td>The active profile has no model for that flavor. Switch <code>LLM_CONFIG_PROFILE</code>, or use a custom <code>LLM_CONFIG_FILE</code> (next session).</td>
 </tr>
 <tr>
-<td>HTTP 401 from an LLM call in an agent</td>
-<td>With a direct profile (<code>inl_litellm</code>, <code>amsc</code>, <code>anl_asksage</code>): the profile's key is missing in the agent's <code>.env</code>. With the <code>registry</code> profile: attach the master key only when <code>cfg.proxy_url</code> is set (next session).</td>
+<td><code>LLMProviderError</code> (401/403) from an LLM call</td>
+<td><code>LLM_API_KEY</code> is missing or wrong in the agent's <code>.env</code>, or it belongs to another profile.</td>
 </tr>
 <tr>
 <td>The agent is running but not in <code>/agents</code></td>
@@ -1720,8 +1715,8 @@ No DeepLynx configured → uploads show &quot;DeepLynx storage is not configured
 <td>Set <code>DEEPLYNX_*</code> and <code>make restart</code>.</td>
 </tr>
 <tr>
-<td>Chat title stays as the raw first question</td>
-<td>Title generation uses <code>llm.small</code>, which is missing under <code>registry</code>. Harmless.</td>
+<td>Agent container restarts, log says &quot;Invalid required DeepLynx configuration&quot;</td>
+<td>Its <code>.env</code> lacks <code>DEEPLYNX_*</code>: <code>python setup_agent.py --env-only &lt;dir&gt;</code>, then <code>make up</code> in the agent dir.</td>
 </tr>
 <tr>
 <td>Mesh viewer error &quot;libGL.so.1&quot;</td>
@@ -1756,15 +1751,16 @@ docker logs <span class="p">&lt;agent&gt;</span> <span class="n">2</span>&gt;&am
   valkey-cli -a <span class="s">&quot;</span>$REDIS_PASSWORD<span class="s">&quot;</span>
 &gt; KEYS artifacts:conv:*
 &gt; KEYS conversation:*
-&gt; KEYS capability_cache:v4:*
+&gt; GET prometheus:agent-registry
 &gt; KEYS session:*</pre>
-<p class="small">Conversation state, artifact catalog, capability cache (60 s TTL), task graph, browser sessions.</p>
+<p class="small">Conversation state, artifact catalog, the agent registry, task graph, browser sessions.</p>
 </div>
 
 <div class="card">
 <h4>Inside a container</h4>
 <pre class="xs">docker exec client-agent env \
   | grep -E <span class="s">&#x27;^(REGISTRY_URL|LLM_CONFIG_)&#x27;</span>
+<span class="c"># REGISTRY_URL=http://backend:8000</span>
 docker exec client-agent python -c <span class="s">&quot;</span>
 <span class="k">import</span> os, urllib.request <span class="k">as</span> u
 r = u.Request(

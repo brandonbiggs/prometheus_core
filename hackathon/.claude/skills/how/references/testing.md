@@ -1,6 +1,6 @@
 # Testing your agent
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 Test without a platform (deck 04, slide 20 and A21): plain functions for the logic, mocks for
 `_execute`, never a real LLM. `uv run pytest` and `uv run ruff check .` must pass (ruff: `E`,
@@ -8,16 +8,17 @@ Test without a platform (deck 04, slide 20 and A21): plain functions for the log
 
 ## Set up the host once
 
-In the agent folder: `uv sync`, then `uv pip install "git+https://github.inl.gov/genesis/prometheus_api.git@<pin>"`
-(or `git+ssh://git@github.inl.gov/...`). The template does not list `prometheus_api`, so without
+In the agent folder: `uv sync`, then `uv pip install <platform>/../sdk` (the SDK from the `prometheus_core`
+clone; elsewhere `"git+https://github.com/idaholab/prometheus_core.git@devel#subdirectory=sdk"`). The template does not list `prometheus_api`, so without
 it the tests fail with `ModuleNotFoundError: No module named 'prometheus_api'`. A later bare
 `uv sync` removes it again: use `uv sync --inexact`. Add a dependency with
 `uv add --no-sync <pkg>`, then `uv sync --inexact`; commit `uv.lock` with `pyproject.toml`.
 
 ## Fixtures and mocks
 
-`tests/conftest.py` gives `context` (`context_id = "test-conversation"`) and `event_queue` (an
-`AsyncMock`; check `event_queue.enqueue_event.await_count`). `asyncio_mode = "auto"`. Pass
+`tests/conftest.py` sets `AGENT_SECRET=test-secret` and `PROMETHEUS_TASK_STORE=memory`, and gives
+`context` (`context_id = "test-conversation"`) and `event_queue` (an `AsyncMock`; check
+`event_queue.enqueue_event.await_count`). `asyncio_mode = "auto"`. Pass
 `skill_id` in `params` yourself: the base class sets it from the metadata only in production
 (`prometheus_api/prometheus_api/agent/base.py:462-469`). Write one test per skill, and one for an
 unknown `skill_id`.
@@ -35,7 +36,7 @@ unknown `skill_id`.
 
 Patch `monkeypatch.setattr(agent, "llm_client", lambda context, **kw: fake)`. For `acall_tool`,
 give the fake `tool_calls=[ToolCall(id="c1", name="pick", arguments={...})]`
-(`prometheus_api/prometheus_api/llm_client/tools.py:34-46`). For input-required, patch
-`load_context_state`, `save_context_state`, and `get_provided_inputs`, and call `_execute` twice
-on the same agent: the first returns `{}`, the second the result (`asking-the-user.md`). Tests do
+(`prometheus_api/prometheus_api/llm_client/tools.py:34-46`). For input-required, call `_execute`
+twice: first without the answer (it returns `{}`), then with the answer merged into `params`, as the
+client-agent sends it (`asking-the-user.md`). `test_build_app_loads_agent_card` fails on a broken card. Tests do
 not prove routing: after they pass, `make up` and test in a fresh chat.

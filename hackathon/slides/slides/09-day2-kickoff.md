@@ -81,7 +81,7 @@ Write your own test files too, with other captions, units, and symbols. An agent
 #### Scaffold the team agent
 
 {.small}
-`/create-agent` in Claude Code, or `setup_agent.py` from the agent template. You pick the agent's name and the repo's name.
+`/create-agent` in Claude Code, or `setup_agent.py` from the agent template. You pick the agent's name and the repo's name. Add libraries with `uv add`; commit `uv.lock`.
 
 #### Two stub skills, routed
 
@@ -181,7 +181,7 @@ One teammate scaffolds the agent, then `git init` and `gh repo create <repo> --s
 #### Fork and branch
 
 {.small}
-Everyone else runs `gh repo fork <owner>/<repo> --clone`, works on a `feature/…` branch, and runs `git pull --rebase upstream main` often.
+Everyone else runs `gh repo fork <owner>/<repo> --clone`, works on a `feature/…` branch, and rebases on `upstream/main` until review starts; after that, merge instead of force-pushing.
 :::
 
 ::: card acc

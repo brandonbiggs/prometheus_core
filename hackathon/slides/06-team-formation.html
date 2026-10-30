@@ -224,15 +224,15 @@ Tune for the conventions, not for the practice file. Hard-coding &quot;Brie Basi
 <tbody>
 <tr>
 <td><strong>DeepLynx works</strong> on your platform</td>
-<td>without it your agent never sees the upload, and the PNG can't render</td>
+<td>agents won't start without it, never see the upload, and the PNG can't render</td>
 </tr>
 <tr>
 <td><strong>Team prefix</strong> on the card name and skill IDs</td>
 <td>every team builds the same skills; same names overwrite each other</td>
 </tr>
 <tr>
-<td><code>matplotlib</code>, <code>pandas</code>… in <code>pyproject.toml</code>; <code>MPLBACKEND=Agg</code></td>
-<td>the base image has none of them, and there is no display</td>
+<td><code>uv add matplotlib pandas</code>, commit <code>uv.lock</code>; <code>MPLBACKEND=Agg</code></td>
+<td>the base image has none of them, the build needs the lock, and there is no display</td>
 </tr>
 <tr>
 <td><code>&quot;streaming&quot;: true</code> in the card</td>
@@ -624,11 +624,10 @@ The orchestrator chains them for a request like <em>&quot;Extract the table with
 <div class="col">
 <pre class="sm"><span class="k">from</span> prometheus_api.agent <span class="k">import</span> MissingInput
 
-ctx = str(context.context_id)
 <span class="c"># df: the table loaded from params[&quot;table_artifact_id&quot;]</span>
 columns = list(df.columns)
-<span class="k">if</span> <span class="k">not</span> x_col <span class="k">or</span> <span class="k">not</span> y_cols:
-    self.save_context_state(ctx, {<span class="s">&quot;table&quot;</span>: table_id})
+x_col, y_col = params.get(<span class="s">&quot;x_column&quot;</span>), params.get(<span class="s">&quot;y_column&quot;</span>)
+<span class="k">if</span> <span class="k">not</span> x_col <span class="k">or</span> <span class="k">not</span> y_col:
     <span class="k">await</span> self.send_input_required(
         context, event_queue,
         missing_inputs=[
@@ -642,9 +641,9 @@ columns = list(df.columns)
             type=<span class="s">&quot;enum&quot;</span>, options=columns)],
         hint=<span class="s">&quot;Choose the columns to plot.&quot;</span>)
     <span class="k">return</span> {}
-<span class="c"># resumed call: self.get_provided_inputs(context)</span>
-<span class="c">#   → {&quot;x_column&quot;: &quot;...&quot;, &quot;y_column&quot;: &quot;...&quot;} → y_columns=[...]</span></pre>
-<p class="small">A string list in <code>options</code> becomes a dropdown in the chat's follow-up form, with your <code>hint</code> as the message. With <code>resolvable_from_context=False</code> (the default) the user is asked. If they type a reply instead, the orchestrator calls you again with new arguments.</p>
+<span class="c"># resumed call: the same params plus the answers,</span>
+<span class="c">#   params[&quot;x_column&quot;], params[&quot;y_column&quot;]</span></pre>
+<p class="small">When the user answers, <code>_execute</code> runs again with the original arguments and the answers merged into <code>params</code>. A string list in <code>options</code> becomes a dropdown in the chat's follow-up form, with your <code>hint</code> as the message. With <code>resolvable_from_context=False</code> (the default) the user is asked. If they type a reply instead, the orchestrator calls you again with new arguments.</p>
 </div>
 
   </div>
@@ -694,12 +693,12 @@ columns = list(df.columns)
 </thead>
 <tbody>
 <tr class="hl">
-<td><strong>DeepLynx is configured</strong> on your platform (local or the shared instance)</td>
-<td>Chat uploads are stored in DeepLynx and passed to agents as artifacts. Without it your agent never sees the file, and a PNG cannot render.</td>
+<td><strong>DeepLynx is configured</strong> (your local instance, deck 03) in the platform's and your agent's <code>.env</code></td>
+<td>Every agent writes an execution record to DeepLynx, so it <strong>won't start</strong> without <code>DEEPLYNX_*</code>. Chat uploads are stored there too, and a PNG cannot render without it.</td>
 </tr>
 <tr>
-<td><code>matplotlib</code>, <code>pandas</code>… are in <code>pyproject.toml</code></td>
-<td>The base image has none of them. Set <code>MPLBACKEND=Agg</code> (no display in the container).</td>
+<td><code>matplotlib</code>, <code>pandas</code>… added with <code>uv add</code>, <code>uv.lock</code> committed</td>
+<td>The base image has none of them, and the build stops without a current <code>uv.lock</code>. Set <code>MPLBACKEND=Agg</code> (no display in the container).</td>
 </tr>
 <tr>
 <td>Extra modules have <code>COPY</code> lines in the Dockerfile</td>
@@ -731,7 +730,7 @@ columns = list(df.columns)
 </tr>
 <tr>
 <td>Your LLM profile and its key are in <code>.env</code>; pick the flavor per call</td>
-<td><code>LLM_CONFIG_PROFILE=inl_litellm</code> (or <code>amsc</code>, <code>anl_asksage</code>) plus its key in <code>LLM_API_KEY</code>; <code>setup_agent.py</code> copies both from <code>platform/.env</code>. Attach <code>LITELLM_MASTER_KEY</code> only when <code>cfg.proxy_url</code> is set (the platform proxy).</td>
+<td>The platform's <code>LLM_CONFIG_PROFILE</code> (e.g. <code>anthropic</code>, <code>genesis</code>, <code>inl_litellm</code>) plus its key in <code>LLM_API_KEY</code>; <code>setup_agent.py</code> copies both from <code>platform/.env</code>. Then just <code>self.llm_client(context)</code>.</td>
 </tr>
 <tr>
 <td>Results stay small</td>

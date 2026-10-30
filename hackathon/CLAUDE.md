@@ -9,8 +9,8 @@ Prometheus. Teach while you help.
   in `../hello-<you>/`, for the practice PR.
 - `agents/<team_name>/`: Day 2. One folder per team.
 - `hollowmere_almanac.md`: the practice file for Day 2. Do not edit it.
-- `../prometheus_platform/` and `../prometheus_agent_template/`: the platform and the template,
-  next to this repository. They are read-only for the hackathon.
+- `../prometheus_core/platform/` and `../prometheus_core/agent-template/`: the platform and the
+  template, in the `prometheus_core` clone next to this repository. They are read-only for the hackathon.
 - `.claude/skills/how/references/`: the knowledge base (KB). Start at `index.md`. Every skill
   obeys `conventions.md`.
 

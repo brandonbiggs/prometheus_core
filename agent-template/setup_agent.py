@@ -49,7 +49,6 @@ PLATFORM_ENV_PATH = Path(__file__).resolve().parent.parent / "platform" / ".env"
 PLATFORM_SECRET_KEYS = (
     "AGENT_SECRET",
     "REDIS_PASSWORD",
-    "LITELLM_MASTER_KEY",
     # Multi-user identity (RS256, verification-side only -- never the private
     # key). ISS/AUD are copied too since a mismatch here silently fails
     # verification even with a correct public key.
@@ -57,8 +56,7 @@ PLATFORM_SECRET_KEYS = (
     "USER_IDENTITY_ISS",
     "USER_IDENTITY_AUD",
     # Not a secret, but copied for the same reason as ISS/AUD: a scaffolded
-    # agent should inherit the platform's inference routing rather than
-    # silently defaulting to `registry` when the platform uses something else.
+    # agent must use the platform's profile; the template has no default.
     "LLM_CONFIG_PROFILE",
     # Every profile reads its provider key from LLM_API_KEY, so the agent can
     # call the same provider the platform does; embeddings may need their own.
@@ -328,7 +326,7 @@ def create_env_from_platform_if_requested(output_dir: Path, assume_defaults: boo
     local_sdk = "LOCAL_SDK" in selected_values
     create_env = confirm_action(
         f"\nFound '{PLATFORM_ENV_PATH}'. Create '{output_dir / '.env'}' with "
-        "DEEPLYNX_*, AGENT_SECRET, REDIS_PASSWORD, LITELLM_MASTER_KEY, "
+        "DEEPLYNX_*, AGENT_SECRET, REDIS_PASSWORD, "
         "LLM_CONFIG_PROFILE, LLM_API_KEY, EMBEDDING_API_KEY, and USER_IDENTITY_* values"
         f"{' (and the locally built base image, LOCAL_SDK=true)' if local_sdk else ''}? (yes/no)",
         "yes",
@@ -367,7 +365,7 @@ def write_agent_env(output_dir: Path, selected_values: dict[str, str]) -> None:
             "# Uncomment this for external network mode",
             "#EXTERNAL_AGENT_HOST=prometheus.host.internal",
             "#EXTERNAL_AGENT_PORT=8042",
-            "#REGISTRY_URL=http://prometheus.host.internal:9977",
+            "#REGISTRY_URL=http://prometheus.host.internal:8600",
             "#REDIS_URL=redis://prometheus.host.internal:6379",
         ]
     )

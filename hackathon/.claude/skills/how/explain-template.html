@@ -5,10 +5,10 @@
     Use the code's names (_execute, agent_card.json, client-agent). ASD-STE100: short, active, one idea per sentence.
   - One self-contained file. No script element, no event-handler attribute, no link element, no CSS import, no remote URL, no web font.
     Click-to-reveal uses <details>. Keep "only light" and the print block.
-  - No secret: write $LITELLM_MASTER_KEY or <your key>, never a value. Escape < > & as &lt; &gt; &amp;.
+  - No secret: write $AGENT_SECRET or <your key>, never a value. Escape < > & as &lt; &gt; &amp;.
   - Cite each fact: "Source: deck 04, slide 6; prometheus_platform/...:226". Never a PDF page. Only the KB, slides, code.
   - Use only the colors below. Roles: neutral (user), ui (chat UI), platform (backend, orchestrator),
-    gateway (LiteLLM), agent (your agent), store (DeepLynx, Valkey), ok (success, artifact), bad (failure).
+    gateway (backend registry and A2A gateway), agent (your agent), store (DeepLynx, Valkey), ok (success, artifact), bad (failure).
     Accent by body class: none = blue (platform, chat turn, registry), t-agent = orange (card, code, artifacts),
     t-git = purple (git).
   - Page: header (eyebrow "Prometheus explainer · <area>", title, one lead sentence, pills), then panels, then

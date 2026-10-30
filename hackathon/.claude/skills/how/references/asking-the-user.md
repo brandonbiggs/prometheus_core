@@ -1,6 +1,6 @@
 # Asking the user
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 The platform asks the user for you. You never parse chat text (deck 04, slides 2 and 21). Short paths:
 `base.py` and `context_state.py` are in `prometheus_api/prometheus_api/agent/`; `agent_loop.py` is in
@@ -26,12 +26,9 @@ does not exist (deck 04, A27).
 ```python
 from prometheus_api.agent import MissingInput
 
-ctx = str(context.context_id)
-state = self.load_context_state(ctx)
-x = params.get("x_column") or self.get_provided_inputs(context).get("x_column")
+x = params.get("x_column")  # the answer is merged into params on the resume
 if not x:
     columns = ["Year", "Residents"]  # TODO: read the real column names
-    self.save_context_state(ctx, {"table_id": params.get("table_artifact_id"), "columns": columns})
     await self.send_input_required(
         context, event_queue,
         missing_inputs=[MissingInput(name="x_column", description="Column for the x axis",
@@ -41,16 +38,18 @@ if not x:
     return {}
 ```
 
-1. `send_input_required` ends the task in `TASK_STATE_INPUT_REQUIRED` (`base.py:1033-1068`). Return `{}`:
+1. `send_input_required` ends the task in `TASK_STATE_INPUT_REQUIRED` (`base.py:1096`). Return `{}`:
    the value is ignored.
-2. The orchestrator calls you again with the same `contextId`, the same `params`, and the answers in a
-   separate part (`tool_discovery.py:475-503`). `get_provided_inputs` returns them (`{}` on the first call).
-3. **Python state does not survive.** Save before you ask, load on the resume (deck 04, slide 12). State is
-   per agent and conversation, JSON, 24 h TTL (`context_state.py:13-87`). Save ids, not DataFrames.
+2. The orchestrator calls you again with the same `contextId` and **all the original arguments plus the
+   answers merged into `params`** (SDK 0.14.1). `self.get_input_sources(context)` tells, per parameter,
+   whether `model`, `user`, or `context` supplied it (`base.py:1047`). There is no `get_provided_inputs`.
+3. **Python state does not survive**, but the original `params` come back, so most skills need no state.
+   For more, `save_context_state` / `load_context_state` (per agent and conversation, JSON, 24 h TTL,
+   `base.py:1038-1042`). Save ids, not DataFrames. Never ask for a secret this way.
 
-`MissingInput` (`base.py:103-114`): `name`, `description`, `user_prompt`, `type` (`enum`, `number` →
-`float`, `integer` → `int`, `boolean`, else text), `options`, `resolvable_from_context`, `sensitive`,
-`required`. An empty answer counts as no answer.
+`MissingInput` (`base.py:134-143`): `name`, `description`, `user_prompt`, `type` (`enum`, `number` →
+`float`, `integer` → `int`, `boolean`, else text), `options`, `resolvable_from_context`, `required`
+(`sensitive` is gone; the client-agent rejects it). An empty answer counts as no answer.
 
 Traps: a typed reply drops the call (`agent_loop.py:745-759`); a `required` input shows the form before
 your code runs. Reference: `prometheus_platform/agents/debug-agents/corrosion-agent/agent.py:112-168`.
