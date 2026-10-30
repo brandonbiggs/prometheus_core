@@ -45,6 +45,15 @@ DEBUG_AGENTS ?= false
 # dependencies and dominates the build time). Default: false.
 OPTIONAL_AGENTS ?= false
 
+# Set LOCAL_DEEPLYNX=true to also run DeepLynx (docker-compose.deeplynx.yml)
+# from its published images, and point the platform at it: every start target
+# first starts DeepLynx and runs `make deeplynx-setup`, which writes the
+# DEEPLYNX_* settings to .env. Its web UI is at http://localhost:3000.
+# Default: false.
+LOCAL_DEEPLYNX ?= false
+DEEPLYNX_SERVER_PORT ?= 5000
+DEEPLYNX_DEP := $(if $(filter true,$(LOCAL_DEEPLYNX)),deeplynx-setup,)
+
 # Publish the client-agent port for host-driven full-system tests without
 # changing the runtime API surface. The system-test suite itself never starts
 # or reconfigures Docker.
@@ -94,6 +103,9 @@ endif
 ifneq ($(AGENT_COMPOSE_FILES),)
 COMPOSE_FILES += -f $(COMPOSE_AGENTS)
 endif
+ifeq ($(LOCAL_DEEPLYNX),true)
+COMPOSE_FILES += -f docker-compose.deeplynx.yml
+endif
 # Automatically include docker-compose.override.yml if present (local dev overrides).
 ifneq ($(wildcard docker-compose.override.yml),)
 COMPOSE_FILES += -f docker-compose.override.yml
@@ -106,6 +118,9 @@ COMPOSE_FILES_NG += -f docker-compose.system-test.yml
 endif
 ifneq ($(wildcard $(COMPOSE_AGENTS)),)
 COMPOSE_FILES_NG += -f $(COMPOSE_AGENTS)
+endif
+ifeq ($(LOCAL_DEEPLYNX),true)
+COMPOSE_FILES_NG += -f docker-compose.deeplynx.yml
 endif
 ifneq ($(wildcard docker-compose.override.yml),)
 COMPOSE_FILES_NG += -f docker-compose.override.yml
@@ -176,6 +191,7 @@ PREREQUISITE_TARGETS := \
 	ng-restart \
 	ng-restart-fg \
 	clear-agent-registry \
+	deeplynx-setup \
 	down \
 	down-v \
 	base-image \
@@ -186,7 +202,7 @@ PREREQUISITE_TARGETS := \
 
 $(PREREQUISITE_TARGETS): check-prerequisites
 
-.PHONY: all up up-fg down down-v build base-image build-plain logs ps generate clean-generated regenerate restart restart-fg ng-up ng-up-fg ng-restart ng-restart-fg init-env clear-agent-registry clear-admin-users clobber help
+.PHONY: all up up-fg down down-v build base-image build-plain logs ps generate clean-generated regenerate restart restart-fg ng-up ng-up-fg ng-restart ng-restart-fg init-env clear-agent-registry deeplynx-setup clear-admin-users clobber help
 
 FORCE:
 
@@ -251,42 +267,42 @@ check: ##@ Wait until the running platform answers on its host ports and every a
 
 up: ##@ Clear agent registrations, build and start all services (detached), then wait until they are up (CHECK=false to skip). Set PROFILE=dev|prod to include the React frontend.
 up: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-up: $(BASE_IMAGE_DEP) generate init-env clear-agent-registry
+up: $(BASE_IMAGE_DEP) generate init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up --build -d $(UP_WAIT) $(UP_ARGS)
 	$(RUN_CHECK)
 
 up-fg: ##@ Clear agent registrations, then build and start all services (foreground). Set PROFILE=dev|prod to include the React frontend.
 up-fg: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-up-fg: $(BASE_IMAGE_DEP) generate init-env clear-agent-registry
+up-fg: $(BASE_IMAGE_DEP) generate init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up --build
 
 restart: ##@ Clear agent registrations, then restart all services without rebuilding.
 restart: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-restart: generate init-env clear-agent-registry
+restart: generate init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up -d $(UP_WAIT)
 	$(RUN_CHECK)
 
 restart-fg: ##@ Clear agent registrations, then restart all services without rebuilding (foreground).
 restart-fg: CLEAR_COMPOSE_FILES := $(COMPOSE_FILES) $(PROFILE_FLAGS)
-restart-fg: generate init-env clear-agent-registry
+restart-fg: generate init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) up
 
 ng-up: ##@ Clear agent registrations, then start without regenerating agents compose.
-ng-up: $(BASE_IMAGE_DEP) init-env clear-agent-registry
+ng-up: $(BASE_IMAGE_DEP) init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up --build -d $(UP_WAIT)
 	$(RUN_CHECK)
 
 ng-up-fg: ##@ Clear agent registrations, then start without regenerating (foreground).
-ng-up-fg: $(BASE_IMAGE_DEP) init-env clear-agent-registry
+ng-up-fg: $(BASE_IMAGE_DEP) init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up --build
 
 ng-restart: ##@ Clear agent registrations, then restart without rebuilding or regenerating.
-ng-restart: init-env clear-agent-registry
+ng-restart: init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up -d $(UP_WAIT)
 	$(RUN_CHECK)
 
 ng-restart-fg: ##@ Clear agent registrations, then restart without rebuilding or regenerating (foreground).
-ng-restart-fg: init-env clear-agent-registry
+ng-restart-fg: init-env clear-agent-registry $(DEEPLYNX_DEP)
 	$(COMPOSE) $(COMPOSE_FILES_NG) $(PROFILE_FLAGS) up
 
 init-env: ##@ Create .env from .env.example if missing, generate blank secrets, check the LLM API key
@@ -303,6 +319,19 @@ clear-agent-registry: ##@ Stop services and delete only the agent registrations 
 		cli="valkey-cli --no-auth-warning -a $$REDIS_PASSWORD"; \
 		for i in $$(seq 1 30); do $$cli ping >/dev/null 2>&1 && break; sleep 1; done; \
 		printf "Cleared %s agent registration key(s).\n" "$$($$cli DEL prometheus:agent-registry)"'
+
+# The agents read DEEPLYNX_* when they start, so DeepLynx has to be up and its
+# key in .env before the rest of the stack starts. Only the DeepLynx services
+# start here, from just the files they need, so the ng-* targets still don't
+# regenerate the agents compose file; the start target that follows reuses them.
+deeplynx-setup: init-env
+deeplynx-setup: ##@ Start the local DeepLynx (LOCAL_DEEPLYNX=true) and save a project and API key for it in .env
+	@if [ "$(LOCAL_DEEPLYNX)" != true ]; then \
+		printf "LOCAL_DEEPLYNX is not true; set it (in .env or on the command line) to run DeepLynx locally.\n"; \
+		exit 1; \
+	fi
+	$(COMPOSE) -f $(COMPOSE_BASE) -f docker-compose.deeplynx.yml up -d --wait --wait-timeout $(WAIT_TIMEOUT) deeplynx-postgres deeplynx-server deeplynx-ui
+	@python3 scripts/deeplynx_setup.py --port $(DEEPLYNX_SERVER_PORT)
 
 clear-admin-users: ##@ Delete all rows from admin-db's users table (re-triggers the first-run setup wizard)
 	@if ! $(COMPOSE) $(COMPOSE_FILES) $(PROFILE_FLAGS) ps --status running --services 2>/dev/null | grep -qx admin-db; then \

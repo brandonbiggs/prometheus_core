@@ -1,0 +1,122 @@
+# A local DeepLynx next to the platform, from the images the DeepLynx repository
+# publishes (its build-images branch). The Makefile adds this file when
+# LOCAL_DEEPLYNX=true, and `make deeplynx-setup` then creates a project and an
+# API key and points DEEPLYNX_* in .env at deeplynx-server. See
+# docs/docs/local-deeplynx.md.
+#
+# Authentication is disabled in the server and in the UI: every request is the
+# local developer. Only for local use and CI.
+
+volumes:
+  deeplynx-db-data:
+  # The server's home: uploaded files (data/) and its data protection keys.
+  # Mounted at the home directory, which the image creates owned by the nexus
+  # user it runs as; a fresh mount point anywhere else would be owned by root
+  deeplynx-data:
+
+services:
+
+  deeplynx-postgres:
+    # The image DeepLynx's Dockerfiles/database/Dockerfile.local builds FROM,
+    # unmodified. When the server and UI images move to a new DeepLynx release,
+    # update this to the one that release uses
+    image: pgvector/pgvector:0.8.3-pg18@sha256:c8a919765f2ef63681329fa21021b830cd4d79d1165bdca730dd016014e4da84
+    environment:
+      # Not "deeplynx": the server's migrations create a deeplynx schema, which
+      # a role of that name finds first on its search path ("$user", public),
+      # and the server then fails on its second start
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DEEPLYNX_DB_PASSWORD:?run make init-env}
+      POSTGRES_DB: deeplynx
+    volumes:
+      # pg18 keeps its data in a versioned directory under /var/lib/postgresql
+      - deeplynx-db-data:/var/lib/postgresql
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d deeplynx"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # The API. Applies its database migrations at startup. Agents reach it as
+  # http://deeplynx-server:5000/api/v1, the host on DEEPLYNX_SERVER_PORT
+  deeplynx-server:
+    image: ghcr.io/idaholab/deeplynx/deeplynx-server:v0.8.0@sha256:a59aac4230a30934ccd2fc4e18e728f2cbb52fac0085c7f36af334abd61b1ec3
+    depends_on:
+      deeplynx-postgres:
+        condition: service_healthy
+    ports:
+      # The UI image calls the API from the browser at localhost:5000 (baked in
+      # at build time), so the UI only works with the default
+      - "${DEEPLYNX_SERVER_PORT:-5000}:5000"
+    networks:
+      - agent-network
+    volumes:
+      - deeplynx-data:/home/nexus
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DEEPLYNX_DB_PASSWORD:?run make init-env}
+      POSTGRES_DB_NAME: deeplynx
+      POSTGRES_DB_HOST: deeplynx-postgres
+      POSTGRES_PORT: "5432"
+      FILE_STORAGE_METHOD: filesystem
+      STORAGE_DIRECTORY: /home/nexus/data
+      DUCKDB_BASE_PATH: /home/nexus/data/duckdb
+      RECOMMENDED_CHUNK_SIZE: "100000000"
+      DISABLE_BACKEND_AUTHENTICATION: "true"
+      # Required at startup even with authentication disabled
+      JWT_SECRET_KEY: ${DEEPLYNX_JWT_SECRET:?run make init-env}
+      JWT_ISSUER: http://localhost:${DEEPLYNX_UI_PORT:-3000}
+      JWT_AUDIENCE: http://localhost:${DEEPLYNX_UI_PORT:-3000}
+      # Encrypt stored credentials, such as object storage connection strings
+      ENCRYPTION_KEY: ${DEEPLYNX_ENCRYPTION_KEY:?run make init-env}
+      ENCRYPTION_IV: ${DEEPLYNX_ENCRYPTION_IV:?run make init-env}
+      INVITE_URL: http://localhost:${DEEPLYNX_UI_PORT:-3000}
+      # Insight (document ingestion) isn't part of this stack, but file uploads
+      # fail with a 500 when the URL isn't set at all
+      INSIGHT_FASTAPI_URL: http://insight-fastapi:5009
+    healthcheck:
+      # The image has neither curl nor wget, and /bin/sh is dash
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/5000
+          && printf 'GET /api/v1/health HTTP/1.0\r\n\r\n' >&3
+          && grep -q healthy <&3
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  # The web UI, at http://localhost:3000, for looking at what the agents stored
+  deeplynx-ui:
+    image: ghcr.io/idaholab/deeplynx/deeplynx-ui:v0.8.0@sha256:be66b5c557a0c46fcf4195392dc99fe8f47548973d42bca94206d0484baf6729
+    depends_on:
+      deeplynx-server:
+        condition: service_healthy
+    ports:
+      - "${DEEPLYNX_UI_PORT:-3000}:3000"
+    networks:
+      - agent-network
+    environment:
+      # Server-side calls from the UI; the browser's go to localhost:5000
+      BACKEND_BASE_URL: http://deeplynx-server:5000/api
+      NEXTAUTH_URL: http://localhost:${DEEPLYNX_UI_PORT:-3000}
+      NEXTAUTH_SECRET: ${DEEPLYNX_UI_SECRET:?run make init-env}
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_DISABLE_FRONTEND_AUTHENTICATION: "true"
+      # Next.js listens on the container's hostname otherwise, not on loopback,
+      # where the healthcheck connects
+      HOSTNAME: 0.0.0.0
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped

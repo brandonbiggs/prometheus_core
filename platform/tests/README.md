@@ -37,6 +37,14 @@ file per service plus a combined one) are uploaded as the
 `platform-up-logs` artifact. It runs on every pull request and every push to
 `devel`, like the rest of the workflow; the whole job takes a few minutes.
 
+The `platform: up deeplynx` job does the same with `LOCAL_DEEPLYNX=true`
+(see `../docs/docs/local-deeplynx.md`): DeepLynx runs next to the platform from
+its published images, and `make deeplynx-setup` gives the services a real
+project and API key for it. `test_integration_deeplynx.py` then stores an item
+and a file through the backend's storage client and reads them back. Without
+the local DeepLynx those tests are skipped. Its logs are uploaded as
+`platform-up-deeplynx-logs`.
+
 ### No real LLM or DeepLynx credentials
 
 None of the integration tests call an LLM or DeepLynx, and nothing at startup
@@ -49,7 +57,9 @@ does either, so CI sets **stub credentials** instead of using secrets:
   endpoints, so they never send a completion.
 - `DEEPLYNX_KEY`, `DEEPLYNX_SECRET`, `DEEPLYNX_ORG_ID` and
   `DEEPLYNX_PROJECT_ID` with placeholder values. Agents check at startup that
-  DeepLynx is configured but don't connect until an artifact is stored.
+  DeepLynx is configured but don't connect until an artifact is stored. In
+  `platform: up deeplynx` they are real, for the local DeepLynx, and need
+  no secrets either.
 
 That makes these tests safe to run on pull requests from forks, which get no
 repository secrets. A test that does need a model response would need a mock

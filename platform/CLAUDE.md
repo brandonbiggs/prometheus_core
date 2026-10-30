@@ -43,7 +43,7 @@ make check           # wait until the running platform answers on its host ports
 
 Launch and restart targets clear LiteLLM's Postgres volume before starting services so stale agent registrations do not survive across platform launches. Valkey state is left intact.
 
-To temporarily exclude an agent, remove (or rename) its `agents/<name>/docker-compose.yml` and re-run `make generate`. Heavy agents that most setups skip live in `agents/optional/<name>/` and are included only with `OPTIONAL_AGENTS=true` (same mechanism as `agents/debug-agents/` + `DEBUG_AGENTS`). `docker-compose.override.yml` is auto-included if present for local-only tweaks.
+To temporarily exclude an agent, remove (or rename) its `agents/<name>/docker-compose.yml` and re-run `make generate`. Heavy agents that most setups skip live in `agents/optional/<name>/` and are included only with `OPTIONAL_AGENTS=true` (same mechanism as `agents/debug-agents/` + `DEBUG_AGENTS`). `docker-compose.override.yml` is auto-included if present for local-only tweaks. `LOCAL_DEEPLYNX=true` adds a local DeepLynx (`docker-compose.deeplynx.yml`), set up by `make deeplynx-setup`.
 
 ## Frontend commands (`frontend/Makefile`)
 
