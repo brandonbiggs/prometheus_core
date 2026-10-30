@@ -38,7 +38,8 @@ file per service plus a combined one) are uploaded as the
 `devel`, like the rest of the workflow; the whole job takes a few minutes.
 
 The `platform: up deeplynx` job does the same with `LOCAL_DEEPLYNX=true`
-(see `../docs/docs/local-deeplynx.md`): DeepLynx runs next to the platform from
+(see `../docs/docs/local-deeplynx.md`), with only the default agents and no
+frontend: DeepLynx runs next to the platform from
 its published images, and `make deeplynx-setup` gives the services a real
 project and API key for it. `test_integration_deeplynx.py` then stores an item
 and a file through the backend's storage client and reads them back. Without

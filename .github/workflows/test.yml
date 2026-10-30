@@ -1116,9 +1116,11 @@ jobs:
     env:
       # Build the prometheus_api base image from ../sdk instead of pulling it
       LOCAL_SDK: "true"
-      DEBUG_AGENTS: "true"
+      # Only the default agents and no frontend: platform: up covers the rest,
+      # and this job starts the stack five times
+      DEBUG_AGENTS: "false"
       OPTIONAL_AGENTS: "false"
-      PROFILE: prod
+      PROFILE: ""
       LOCAL_DEEPLYNX: "true"
       # make up runs init_env.py, which creates .env from .env.example,
       # generates every secret, and takes the profile and its key from the
