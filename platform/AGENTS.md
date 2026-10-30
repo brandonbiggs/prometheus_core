@@ -89,7 +89,7 @@ For every task:
 - Context is the constraint. Long sessions with accumulated failed attempts perform worse than fresh sessions with a better prompt.
 - After two failed corrections on the same issue, stop. Summarize what you learned and ask the user to reset the session with a sharper prompt.
 - Use subagents (Claude Code: "use subagents to investigate X") for exploration tasks that would otherwise pollute the main context with dozens of file reads.
-- When committing, write descriptive commit messages (subject under 72 chars, body explains the why). No "update file" or "fix bug" commits. No "Co-Authored-By: Claude" attribution unless the project explicitly wants it.
+- When committing, write descriptive commit messages (subject under 72 chars, body explains the why). No "update file" or "fix bug" commits. Disclose AI assistance as described in `CONTRIBUTING.md` (AI-assisted contributions).
 
 ---
 
@@ -138,19 +138,22 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 **Fill this in per project. Keep it specific. Delete sections that don't apply.**
 
 ### Stack
-- Language and version:
-- Framework(s):
-- Package manager:
-- Runtime / deployment target:
+- Language and version: Python 3.12+ (backend, agents, infra tests); TypeScript in strict mode on Node 22 (frontend)
+- Framework(s): FastAPI (backend), React + Vite (frontend), `PrometheusAgent` from the `prometheus_api` SDK (agents)
+- Package manager: `uv` with a committed `uv.lock` per Python project; npm with `package-lock.json` for the frontend
+- Runtime / deployment target: Docker Compose stack driven by the root `Makefile` (see `CLAUDE.md`)
 
 ### Commands
-- Build: `make up-fg`
-- Test frontend: `cd frontend && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run python -m pytest -p pytest_asyncio.plugin tests`
-- Test frontend single file: `cd frontend && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run python -m pytest -p pytest_asyncio.plugin tests/test_plugins.py`
+- Run locally: `make up` (detached, waits until healthy) or `make up-fg`
+- Test backend: `cd backend && uv run pytest`
+- Test backend single file: `cd backend && uv run pytest tests/test_api_surface.py`
+- Lint and type-check backend: `cd backend && uv run ruff check && uv run ruff format --check && uv run mypy app/`
+- Test an agent: `cd agents/<name> && uv run pytest`
+- Lint and type-check frontend: `cd frontend && make check`
+- Test frontend: `cd frontend && node --test --experimental-strip-types $(find src -name '*.test.ts')`
 - Test infrastructure static: `make test-static`
-- Test infrastructure integration: `make test-integration`
-- Lint: ``python -m py_compile **/*.py`
-- Run locally: `make up-fg`
+- Test infrastructure integration: `make test-integration` (containers must be running)
+- Copyright markings: `make check-markings`
 
 Prefer single-file or single-test runs during iteration. Full suites are for the final verification pass.
 
