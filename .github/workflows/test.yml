@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # Registry build cache that publish-images writes on devel (build-image.yml),
+  # read-only here. One package per image, one tag per platform. The packages
+  # are public, so the docker build jobs need no login
+  BUILD_CACHE: ghcr.io/${{ github.repository }}/buildcache-prometheus
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -48,45 +54,59 @@ jobs:
           gitleaks git --redact --no-banner --log-opts="$BASE_SHA..$HEAD_SHA" .
 
   ruff:
-    name: "ruff ${{ matrix.project }}"
+    name: "ruff"
     runs-on: ubuntu-26.04
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - sdk
-          - platform/backend
-          - platform/tests
-          - platform/scripts
-          - platform/agents
-          - agent-template
-        include:
-          # Not a uv project; linted with platform/tests' locked ruff
-          - project: platform/scripts
-            uv-project: ../tests
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
-    env:
-      UV_PROJECT: ${{ matrix.uv-project || '.' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
-      - name: Sync environment
-        # Only the dev group, for each project's locked ruff version
-        run: uv sync --frozen --only-dev
       - name: Check
-        run: uv run --frozen --no-sync ruff check --output-format=github .
-      - name: Format
-        if: ${{ !cancelled() }}
-        run: uv run --frozen --no-sync ruff format --check --diff .
+        # Every project is checked even if an earlier one fails; the step fails
+        # at the end if any did. Each project uses its own locked ruff version
+        # from just the dev group
+        run: |
+          # <project>[:<uv project, relative to it>]. platform/scripts isn't a
+          # uv project, so it's linted with platform/tests' locked ruff
+          projects=(
+            sdk
+            platform/backend
+            platform/tests
+            platform/scripts:../tests
+            platform/agents
+            agent-template
+          )
+          failed=()
+          for entry in "${projects[@]}"; do
+            project="${entry%%:*}"
+            uv_project="."
+            if [[ "$entry" == *:* ]]; then uv_project="${entry#*:}"; fi
+
+            echo "::group::ruff $project"
+            if ! (
+              set -e
+              cd "$project"
+              export UV_PROJECT="$uv_project"
+              uv sync --frozen --only-dev
+              rc=0
+              uv run --frozen --no-sync ruff check --output-format=github . || rc=1
+              uv run --frozen --no-sync ruff format --check --diff . || rc=1
+              exit "$rc"
+            ); then
+              failed+=("$project")
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "::error::ruff failed in: ${failed[*]}"
+            exit 1
+          fi
 
   markings:
     name: "markings"
@@ -111,7 +131,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -207,7 +227,7 @@ jobs:
     name: "k3d: cluster targets"
     needs: gitleaks
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: platform
@@ -285,7 +305,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -313,7 +333,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -344,7 +364,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -375,7 +395,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -400,7 +420,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -419,7 +439,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Typecheck
         if: ${{ !cancelled() }}
-        run: uv run --frozen mypy setup_agent.py
+        run: uv run --frozen mypy .
 
   agent-template-scaffold:
     name: "agent-template: scaffold python ${{ matrix.python }}"
@@ -435,7 +455,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -505,6 +525,7 @@ jobs:
           push: false
           load: true
           tags: sdk:${{ matrix.platform }}
+          cache-from: type=registry,ref=${{ env.BUILD_CACHE }}_sdk-devel:${{ matrix.platform }}
       - name: Test
         # The image only has the installed package; mount the checkout for
         # pyproject.toml, uv.lock, and the tests
@@ -532,7 +553,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # Matches the node image in frontend/Dockerfile
           node-version: "22.19.0"
@@ -544,8 +565,28 @@ jobs:
         run: npm run lint
       - name: Typecheck
         run: npm run typecheck
-      - name: Unit tests
-        run: node --test --experimental-strip-types 'src/**/*.test.ts'
+      - name: Tests
+        run: npm run test:coverage
+      # The shared coverage action reads Python's coverage report, so the
+      # frontend's summary, path prefix and upload are done here instead
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          total=$(node -p 'require("./coverage/coverage-summary.json").total.lines.pct')
+          echo "frontend line coverage: **${total}%**" >> "$GITHUB_STEP_SUMMARY"
+      - name: Prefix coverage paths
+        if: ${{ !cancelled() }}
+        # Report names are relative to the frontend; make them repo-root-relative
+        run: sed -i 's#filename="#filename="platform/frontend/#' coverage/cobertura-coverage.xml
+      - name: Upload coverage
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: frontend
+          files: platform/frontend/coverage/cobertura-coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
       - name: Build
         run: npm run build
 
@@ -578,6 +619,7 @@ jobs:
           build-contexts: certs=common/certs
           platforms: linux/${{ matrix.platform }}
           push: false
+          cache-from: type=registry,ref=${{ env.BUILD_CACHE }}_frontend-devel:${{ matrix.platform }}
 
   platform-backend-docker:
     name: "platform: backend docker ${{ matrix.platform }}"
@@ -609,6 +651,7 @@ jobs:
             certs=common/certs
           platforms: linux/${{ matrix.platform }}
           push: false
+          cache-from: type=registry,ref=${{ env.BUILD_CACHE }}_backend-devel:${{ matrix.platform }}
 
   platform-backend-python:
     name: "platform: backend python ${{ matrix.python }}"
@@ -627,7 +670,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: ${{ matrix.python }}
@@ -647,6 +690,52 @@ jobs:
           flag: backend
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  platform-backend-alembic:
+    # The unit tests run on in-memory SQLite, so this is the only place the
+    # models meet real Postgres and asyncpg outside the compose stack. Upgrades
+    # an empty database to head, then fails if the models differ from the
+    # migrated schema, such as a model change committed without a migration
+    name: "platform: backend alembic check"
+    needs: gitleaks
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: platform/backend
+    env:
+      ADMIN_DATABASE_URL: postgresql+asyncpg://admin:ci-test-password@localhost:5432/admin
+    services:
+      admin-db:
+        # The same image as admin-db in platform/docker-compose.yml
+        image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.11.25"
+          python-version: "3.12"
+      - name: Sync environment
+        run: uv sync --frozen
+      - name: Upgrade
+        run: uv run --frozen --no-sync alembic upgrade head
+      - name: Check
+        # Exits non-zero and prints the diff if the models have drifted
+        run: uv run --frozen --no-sync alembic check
+
   platform-infrastructure:
     name: "platform: infrastructure"
     needs: gitleaks
@@ -660,7 +749,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
@@ -672,22 +761,13 @@ jobs:
         run: uv run --frozen --no-sync python -m pytest --color=yes -m "not integration"
 
   platform-compose:
-    name: "platform: compose debug=${{ matrix.debug }} optional=${{ matrix.optional }} system-test=${{ matrix.system-test }}"
+    name: "platform: compose"
     needs: gitleaks
     runs-on: ubuntu-26.04
-    strategy:
-      fail-fast: false
-      matrix:
-        debug: ["false", "true"]
-        optional: ["false", "true"]
-        system-test: ["false", "true"]
     defaults:
       run:
         working-directory: platform
     env:
-      DEBUG_AGENTS: ${{ matrix.debug }}
-      OPTIONAL_AGENTS: ${{ matrix.optional }}
-      SYSTEM_TEST: ${{ matrix.system-test }}
       # Placeholders for the variables .env sets, which init_env.py generates
       # in make up. config only interpolates them
       ADMIN_DB_PASSWORD: placeholder
@@ -699,69 +779,230 @@ jobs:
       LLM_CONFIG_PROFILE: placeholder
       PROMETHEUS_API_BASE_IMAGE_HASH: placeholder
       REDIS_PASSWORD: placeholder
+      # For docker-compose.build-cache.yml, with BUILD_CACHE from the workflow
+      BUILD_CACHE_PLATFORM: amd64
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Generate
-        run: make generate
       - name: Validate
-        # The same files the Makefile passes, with both profiles so every
-        # service is checked. Fails on warnings too, such as an unset variable
+        # Every combination of debug agents, optional agents and the system-test
+        # file, each after its own make generate. The same files the Makefile
+        # passes, with both profiles so every service is checked. Fails on
+        # warnings too, such as an unset variable
         run: |
-          files=(-f docker-compose.yml -f docker-compose.agents.yml)
-          if [ "$SYSTEM_TEST" = true ]; then
-            files+=(-f docker-compose.system-test.yml)
-          fi
-          docker compose "${files[@]}" --profile dev --profile prod config -q 2> "$RUNNER_TEMP/config.log" \
-            || { cat "$RUNNER_TEMP/config.log"; exit 1; }
-          if [ -s "$RUNNER_TEMP/config.log" ]; then
-            cat "$RUNNER_TEMP/config.log"
-            echo "::error::docker compose config printed warnings"
-            exit 1
-          fi
+          failed=0
+          for debug in false true; do
+            for optional in false true; do
+              for system_test in false true; do
+                combo="debug=$debug optional=$optional system-test=$system_test"
+                echo "::group::compose $combo"
+                files=(-f docker-compose.yml -f docker-compose.agents.yml -f docker-compose.build-cache.yml)
+                if [ "$system_test" = true ]; then
+                  files+=(-f docker-compose.system-test.yml)
+                fi
+                if ! DEBUG_AGENTS=$debug OPTIONAL_AGENTS=$optional make generate; then
+                  echo "::error::make generate failed for $combo"
+                  failed=1
+                elif ! docker compose "${files[@]}" --profile dev --profile prod config -q 2> "$RUNNER_TEMP/config.log"; then
+                  cat "$RUNNER_TEMP/config.log"
+                  echo "::error::docker compose config failed for $combo"
+                  failed=1
+                elif [ -s "$RUNNER_TEMP/config.log" ]; then
+                  cat "$RUNNER_TEMP/config.log"
+                  echo "::error::docker compose config printed warnings for $combo"
+                  failed=1
+                fi
+                echo "::endgroup::"
+              done
+            done
+          done
+          exit $failed
 
   agent-template-compose:
-    name: "agent-template: compose ${{ matrix.network }}"
+    name: "agent-template: compose"
     needs: gitleaks
     runs-on: ubuntu-26.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - network: internal
-          - network: external
-            host: localhost
-            port: "8042"
     defaults:
       run:
         working-directory: agent-template/agent_template
     env:
-      NETWORK: ${{ matrix.network }}
       # Placeholders for the variables .env sets. config only interpolates them
       AGENT_SECRET: placeholder
       LITELLM_MASTER_KEY: placeholder
       REDIS_PASSWORD: placeholder
-      # Set together for external mode, as the Makefile requires
-      EXTERNAL_AGENT_HOST: ${{ matrix.host }}
-      EXTERNAL_AGENT_PORT: ${{ matrix.port }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Validate
-        # The same files the Makefile passes. Fails on warnings too, such as
-        # an unset variable
+        # Each network mode, with the same files the Makefile passes. External
+        # mode sets the host and port together, as the Makefile requires. Fails
+        # on warnings too, such as an unset variable
         run: |
-          docker compose -f docker-compose.yml -f "docker-compose.net_$NETWORK.yml" config -q 2> "$RUNNER_TEMP/config.log" \
-            || { cat "$RUNNER_TEMP/config.log"; exit 1; }
-          if [ -s "$RUNNER_TEMP/config.log" ]; then
-            cat "$RUNNER_TEMP/config.log"
-            echo "::error::docker compose config printed warnings"
-            exit 1
-          fi
+          failed=0
+          for network in internal external; do
+            echo "::group::compose $network"
+            if [ "$network" = external ]; then
+              export EXTERNAL_AGENT_HOST=localhost EXTERNAL_AGENT_PORT=8042
+            else
+              unset EXTERNAL_AGENT_HOST EXTERNAL_AGENT_PORT
+            fi
+            if ! docker compose -f docker-compose.yml -f "docker-compose.net_$network.yml" config -q 2> "$RUNNER_TEMP/config.log"; then
+              cat "$RUNNER_TEMP/config.log"
+              echo "::error::docker compose config failed for $network"
+              failed=1
+            elif [ -s "$RUNNER_TEMP/config.log" ]; then
+              cat "$RUNNER_TEMP/config.log"
+              echo "::error::docker compose config printed warnings for $network"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $failed
+
+  # Follows the in-tree deployment path in agent-template/TUTORIAL.md (Step 1,
+  # then Step 9): scaffold an agent, uv sync, copy it to platform/agents/, then
+  # make generate and make up. Then checks it through the backend. Stub
+  # credentials, as in platform: up.
+  #
+  # Keep in sync with the "In-tree deployment" sections of
+  # agent-template/TUTORIAL.md and the scaffolding notes in
+  # agent-template/README.md: a change to those steps belongs here too. The
+  # steps marked CI only are not part of the documented flow.
+  agent-template-platform:
+    name: "agent-template: platform"
+    needs: [gitleaks, platform-compose, agent-template-scaffold]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: platform
+    env:
+      # CI only: build the prometheus_api base image from ../sdk, so the PR's
+      # SDK is tested, instead of pulling the pinned registry image
+      LOCAL_SDK: "true"
+      # The default agents (client-agent, form-filler, synthesis) start with the
+      # scaffolded one. No debug or optional agents, and no frontend
+      DEBUG_AGENTS: "false"
+      OPTIONAL_AGENTS: "false"
+      PROFILE: ""
+      # CI only: stub credentials, as in platform: up
+      LLM_CONFIG_PROFILE: anthropic
+      LLM_API_KEY: sk-ant-test-not-real
+      DEEPLYNX_KEY: ci-test-key
+      DEEPLYNX_SECRET: ci-test-secret
+      DEEPLYNX_ORG_ID: "1"
+      DEEPLYNX_PROJECT_ID: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.11.25"
+          python-version: "3.12"
+      - name: Create platform .env
+        # Before scaffolding, so setup_agent.py copies the platform's secrets
+        # into the agent's .env, as README.md describes
+        run: |
+          make init-env
+          # CI only: once .env exists, make loads it over the environment, and
+          # its blank DEEPLYNX_* lines would hide the stubs from every container
+          sed -i.bak \
+            -e "s|^DEEPLYNX_KEY=.*|DEEPLYNX_KEY=$DEEPLYNX_KEY|" \
+            -e "s|^DEEPLYNX_SECRET=.*|DEEPLYNX_SECRET=$DEEPLYNX_SECRET|" \
+            -e "s|^DEEPLYNX_ORG_ID=.*|DEEPLYNX_ORG_ID=$DEEPLYNX_ORG_ID|" \
+            -e "s|^DEEPLYNX_PROJECT_ID=.*|DEEPLYNX_PROJECT_ID=$DEEPLYNX_PROJECT_ID|" \
+            .env
+          rm .env.bak
+      - name: Scaffold
+        # TUTORIAL.md Step 1. The agent registers as ci-check-agent, from the
+        # card name "CI Check Agent"
+        run: python3 ../agent-template/setup_agent.py --yes "CI Check" "$RUNNER_TEMP/ci-check-agent"
+      - name: Sync
+        # TUTORIAL.md Step 1. Creates the uv.lock the Dockerfile requires
+        working-directory: ${{ runner.temp }}/ci-check-agent
+        run: uv sync
+      - name: Copy into the platform
+        # TUTORIAL.md Step 9, in-tree deployment
+        run: |
+          cp -R "$RUNNER_TEMP/ci-check-agent" agents/ci-check-agent
+          # CI only: the image installs its own dependencies, so keep the
+          # venv out of the Docker build context
+          rm -rf agents/ci-check-agent/.venv
+      - name: Point the agent at the backend registry
+        # CI only: the template compose still defaults to LiteLLM, but the
+        # platform's registry is the backend, and it checks AGENT_SECRET. The
+        # same two lines the platform's own agents have. Remove this step once
+        # the template compose has them (open PR #276). The platform's .env and
+        # this job's environment fill in the variables, not the agent's .env
+        working-directory: platform/agents/ci-check-agent
+        run: |
+          sed -i \
+            -e 's|REGISTRY_URL: .*|REGISTRY_URL: http://backend:8000|' \
+            -e "s|LITELLM_MASTER_KEY: .*|LITELLM_MASTER_KEY: \${AGENT_SECRET}|" \
+            docker-compose.yml
+          grep -n 'REGISTRY_URL\|LITELLM_MASTER_KEY' docker-compose.yml
+      - name: Generate
+        # TUTORIAL.md Step 9. Lists the agents make up will start
+        run: make generate
+      - name: Use the containerd image store
+        # CI only: make up imports the registry build cache, which the default
+        # builder can only do with this store
+        uses: ./.github/actions/containerd-image-store
+      - name: Start
+        # TUTORIAL.md Step 9. Waits for every healthcheck, then make check
+        # waits for every agent, the scaffolded one included, to be registered
+        # with the backend
+        run: make up
+      - name: Check the agent card
+        # TUTORIAL.md Step 9, verify registration. What the client-agent would
+        # read: the card the scaffolded agent registered, served by the backend
+        # gateway. The tutorial's LiteLLM check on port 9977 is what #276 replaces
+        run: |
+          secret=$(sed -n 's/^AGENT_SECRET=//p' .env)
+          echo "::add-mask::$secret"
+          curl -fsS -H "Authorization: Bearer $secret" http://localhost:8600/a2a/ci-check-agent > "$RUNNER_TEMP/card.json"
+          python3 - "$RUNNER_TEMP/card.json" <<'EOF'
+          import json
+          import sys
+
+          card = json.load(open(sys.argv[1]))
+          skills = [skill["id"] for skill in card["skills"]]
+          assert card["name"] == "CI Check Agent", card["name"]
+          assert skills == ["ci_check_analysis"], skills
+          print(f"{card['name']}: {skills}")
+          EOF
+      - name: Show status
+        if: ${{ failure() }}
+        run: docker ps --all
+      - name: Collect logs
+        if: ${{ failure() }}
+        env:
+          COMPOSE_PROJECT_NAME: prometheus_platform
+          COMPOSE_FILE: docker-compose.yml:docker-compose.agents.yml
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs"
+          for service in $(docker compose config --services); do
+            docker compose logs --no-color --timestamps "$service" > "$RUNNER_TEMP/logs/$service.log"
+          done
+          docker ps --all > "$RUNNER_TEMP/logs/ps.txt"
+          cat "$RUNNER_TEMP/logs"/*.log
+      - name: Upload logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: agent-template-platform-logs
+          path: ${{ runner.temp }}/logs/
+          retention-days: 14
+      - name: Stop
+        if: ${{ always() }}
+        run: make down-v
 
   # Runs on every PR, merge queue and devel push like the rest of this
   # workflow: the whole job, build included, takes a few minutes, so nightly
@@ -798,14 +1039,18 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"
+      - name: Use the containerd image store
+        # make up imports the registry build cache, which the default builder
+        # can only do with this store
+        uses: ./.github/actions/containerd-image-store
       - name: Start
         # make up waits for every healthcheck, then runs make check: the
         # backend and frontend on their host ports, the frontend's /api proxy,
-        # and every agent registered with LiteLLM
+        # and every agent registered with the backend
         run: make up
       - name: Sync test environment
         working-directory: platform/tests
@@ -837,7 +1082,7 @@ jobs:
           cat "$RUNNER_TEMP/logs/all.log"
       - name: Upload logs
         if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: platform-up-logs
           path: ${{ runner.temp }}/logs/
@@ -901,7 +1146,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.11.25"
           python-version: "3.12"

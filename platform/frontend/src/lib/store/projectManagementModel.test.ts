@@ -14,7 +14,7 @@
 // of the six roles, with 0 for a role that has no member, and memberCountLabel() says
 // "1 member" for one and "N members" otherwise.
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   countMembersByRole,

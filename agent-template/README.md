@@ -54,6 +54,7 @@ my-agent/
 ├── workflows/
 ├── pyproject.toml
 ├── Dockerfile
+├── .dockerignore
 ├── docker-compose.yml
 ├── docker-compose.net_internal.yml
 ├── docker-compose.net_external.yml
@@ -64,6 +65,11 @@ my-agent/
 if you have created the platform's `.env` (`platform/.env` in this repository),
 the `setup_agent.py` script will optionally inspect it and copy over all required
 secrets to make the newly instantiated agent register with the platform out of the box.
+
+<!-- Keep in sync with the "agent-template: platform" job in
+     .github/workflows/test.yml, which creates platform/.env, scaffolds with
+     --yes, and starts the agent on the platform in CI. If you change the
+     scaffolding or .env behavior described here, update the job to match. -->
 
 > Prefer to do it by hand? Copy `agent_template/` and replace the `TEMPLATE_*`
 > placeholders yourself. See [`TUTORIAL.md`](TUTORIAL.md).

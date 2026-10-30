@@ -458,7 +458,7 @@ def create_agent(replacements: dict[str, str], assume_defaults: bool = False) ->
         if not file_path.is_file():
             continue
         relative_parts = file_path.relative_to(template_dir).parts
-        if file_path.name not in {".env.example", ".python-version"} and any(
+        if file_path.name not in {".dockerignore", ".env.example", ".python-version"} and any(
             part.startswith(".") for part in relative_parts
         ):
             continue

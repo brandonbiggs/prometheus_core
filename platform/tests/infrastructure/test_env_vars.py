@@ -31,8 +31,6 @@ REQUIRED_VARS = [
     "AGENT_SECRET",
     "REDIS_PASSWORD",
     "BACKEND_JWT_SECRET",
-    "LITELLM_MASTER_KEY",
-    "LITELLM_DB_PASSWORD",
     "ADMIN_DB_PASSWORD",
     "ADMIN_DB_ENCRYPTION_KEY",
 ]
@@ -217,7 +215,6 @@ def test_profiles_match_sdk_llm_configs():
 def test_port_vars_have_values(env_example_vars):
     """Port variables should have values defined in .env.example."""
     port_vars = [
-        "LITELLM_LOCAL_PORT",
         "REDIS_LOCAL_PORT",
         "CLIENT_AGENT_PORT",
         "BACKEND_PORT",

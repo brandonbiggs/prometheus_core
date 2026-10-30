@@ -17,6 +17,7 @@ responses in the Prometheus web UI.
 | `pyproject.toml` | Extra Python dependencies your code imports directly. |
 | `uv.lock` | Created by your first `uv sync`. Commit it with `pyproject.toml`; the image build fails without it. |
 | `Dockerfile` | Builds the image from the pinned `prometheus_api` base image. |
+| `.dockerignore` | Keeps `.venv`, `tests/`, and `__pycache__` out of the build context, so they can't invalidate the image's `COPY` layers. |
 | `docker-compose.yml` | Common service definition for containerized runs. |
 | `docker-compose.net_internal.yml` | Default network include for joining the platform Docker network. |
 | `docker-compose.net_external.yml` | Network include for exposing the agent port outside Docker. |

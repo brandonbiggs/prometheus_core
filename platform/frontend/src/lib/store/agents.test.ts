@@ -11,30 +11,12 @@
 // SPDX-License-Identifier: MIT
 
 import assert from "node:assert/strict";
-import { register } from "node:module";
-import test from "node:test";
+import { test, vi } from "vitest";
+import { useAgents } from "./agents.ts";
 
 /* The real agents store, with React stubbed out so that
  * useSyncExternalStore(sub, get) returns get(). */
-const hooks = `
-export async function resolve(specifier, context, next) {
-  if (specifier === "react") return { url: "stub:react", shortCircuit: true };
-  return next(specifier, context);
-}
-export async function load(url, context, next) {
-  if (url === "stub:react") {
-    return {
-      format: "module",
-      shortCircuit: true,
-      source: "export function useSyncExternalStore(sub, get) { return get(); }",
-    };
-  }
-  return next(url, context);
-}
-`;
-register("data:text/javascript," + encodeURIComponent(hooks));
-
-const { useAgents } = await import("./agents.ts");
+vi.mock("react", () => ({ useSyncExternalStore: (_sub: unknown, get: () => unknown) => get() }));
 
 const ICONS = ["box", "grid", "activity", "wind", "thermometer", "shield", "database", "file-text"];
 

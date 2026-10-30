@@ -1,7 +1,7 @@
 codecov:
   notify:
     # One upload per unit that reports coverage; raise it as units are added
-    after_n_builds: 15
+    after_n_builds: 16
 
 # Mark uncovered changed lines inline in the PR diff
 github_checks:
@@ -9,16 +9,32 @@ github_checks:
 
 coverage:
   status:
-    # Overall coverage may not drop below the base commit's
+    # Overall coverage may not drop below the base commit's. The frontend is
+    # reported but never blocks: it tests what matters rather than every line
     project:
       default:
         target: auto
         threshold: 0%
-    # Every new or changed line must be covered
+        paths:
+          - "!platform/frontend/"
+      frontend:
+        target: auto
+        informational: true
+        flags:
+          - frontend
+    # Every new or changed line must be covered, except in the frontend, whose
+    # uncovered lines are shown on the PR without failing it
     patch:
       default:
         target: 100%
         threshold: 0%
+        paths:
+          - "!platform/frontend/"
+      frontend:
+        target: 100%
+        informational: true
+        flags:
+          - frontend
 
 flags:
   sdk:
@@ -27,6 +43,9 @@ flags:
   backend:
     paths:
       - platform/backend/app/
+  frontend:
+    paths:
+      - platform/frontend/src/
   client-agent:
     paths:
       - platform/agents/client-agent/

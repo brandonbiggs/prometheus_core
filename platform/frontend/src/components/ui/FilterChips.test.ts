@@ -11,28 +11,10 @@
 // SPDX-License-Identifier: MIT
 
 import assert from "node:assert/strict";
-import { createRequire, register } from "node:module";
-import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { test } from "vitest";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-
-/* The component, compiled from .tsx by esbuild (already installed through Vite).
- * A loader hook is needed because type stripping does not run JSX. The hook is a data: URL,
- * which cannot resolve a bare specifier, so it imports esbuild by its absolute file URL. */
-const ESBUILD = pathToFileURL(createRequire(import.meta.url).resolve("esbuild")).href;
-const hooks = `
-import { transform } from ${JSON.stringify(ESBUILD)};
-export async function load(url, context, next) {
-  if (!url.endsWith(".tsx")) return next(url, context);
-  const loaded = await next(url, { ...context, format: "module" });
-  const { code } = await transform(String(loaded.source), { loader: "tsx", jsx: "automatic", format: "esm" });
-  return { format: "module", shortCircuit: true, source: code };
-}
-`;
-register("data:text/javascript," + encodeURIComponent(hooks));
-
-const { FilterChips } = await import("./FilterChips.tsx");
+import { FilterChips } from "./FilterChips.tsx";
 
 type Element = ReactElement<Record<string, unknown>>;
 const CHIPS = [

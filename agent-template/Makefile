@@ -32,7 +32,7 @@ format: ##@ Run ruff formatter (report only)
 	uv run ruff format --check .
 
 typecheck: ##@ Run mypy type checker
-	uv run mypy setup_agent.py
+	uv run mypy .
 
 test: ##@ Run unit tests
 	uv run pytest

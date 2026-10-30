@@ -6,14 +6,19 @@ name: build-image
 on:
   workflow_call:
     inputs:
+      prefix:
+        description: Registry path the packages go under, e.g. ghcr.io/owner/repo
+        required: true
+        type: string
       name:
-        description: Short name, unique within the run (keys the digest artifacts)
+        description: Short name, unique within the run (keys the digest artifacts). The image is prometheus_<name><suffix>
         required: true
         type: string
-      image:
-        description: Full image name, without the tag
-        required: true
+      suffix:
+        description: Appended to the image name, e.g. -devel
+        required: false
         type: string
+        default: ""
       tag:
         required: true
         type: string
@@ -44,12 +49,20 @@ permissions:
   contents: read
   packages: write
 
+env:
+  IMAGE: ${{ inputs.prefix }}/prometheus_${{ inputs.name }}${{ inputs.suffix }}
+  # Build cache for the PR builds in test.yml, which only read it. One tag per
+  # platform. Only this workflow, never PR code, writes it
+  CACHE: ${{ inputs.prefix }}/buildcache-prometheus_${{ inputs.name }}${{ inputs.suffix }}
+
 jobs:
   build:
     name: "build ${{ matrix.platform }}"
     runs-on: ${{ matrix.runner }}
     strategy:
-      fail-fast: true
+      # A failed platform shouldn't cancel the other one, which still writes
+      # its build cache for the next run. The merge job needs both to run
+      fail-fast: false
       matrix:
         include:
           - platform: amd64
@@ -85,9 +98,9 @@ jobs:
             org.opencontainers.image.revision=${{ inputs.sha }}
             org.opencontainers.image.version=${{ inputs.tag }}
           # The tag is applied in the merge job, once both platforms exist
-          outputs: type=image,name=${{ inputs.image }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=${{ inputs.name }}-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.name }}-${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.CACHE }}:${{ matrix.platform }}
+          cache-to: type=registry,ref=${{ env.CACHE }}:${{ matrix.platform }},mode=max,image-manifest=true,oci-mediatypes=true
       - name: Export digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -95,7 +108,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/digests"
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
       - name: Upload digest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digest-${{ inputs.name }}-${{ matrix.platform }}
           path: ${{ runner.temp }}/digests/*
@@ -108,7 +121,7 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Download digests
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ${{ runner.temp }}/digests
           pattern: digest-${{ inputs.name }}-*
@@ -124,7 +137,6 @@ jobs:
       - name: Create multi-arch tag
         working-directory: ${{ runner.temp }}/digests
         env:
-          IMAGE: ${{ inputs.image }}
           TAG: ${{ inputs.tag }}
           SOURCE: ${{ github.server_url }}/${{ github.repository }}
           SHA: ${{ inputs.sha }}
@@ -143,5 +155,5 @@ jobs:
             "${digests[@]/#/$IMAGE@sha256:}"
       - name: Inspect
         env:
-          REF: ${{ inputs.image }}:${{ inputs.tag }}
-        run: docker buildx imagetools inspect "$REF"
+          TAG: ${{ inputs.tag }}
+        run: docker buildx imagetools inspect "$IMAGE:$TAG"

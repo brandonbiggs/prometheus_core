@@ -494,7 +494,7 @@ All containers share one bridge network, `prometheus_platform_agent-network`. Th
 | **backend** | `backend` | `./backend` (uv image + `../sdk`) | 8600 | Login, sessions, chat turn, SSE, uploads, artifacts, admin API, mesh conversion, **agent registry + A2A gateway** |
 | **client-agent** | `client-agent` | `./agents/client-agent` | (8001 in system-test mode) | Orchestrator: tool-calling loop, follow-ups, approval, dispatch |
 | **admin-db** | `admin-db` | `postgres:16-alpine` | — | Users (bcrypt), OIDC providers, RS256 signing keys |
-| **redis** | `agent-valkey` | `valkey/valkey-bundle:9.1.0` | 6379 | Conversation state, sessions, SSE bus, artifact catalog, task graph, caches, agent registry (**wiped on every `make up`**) |
+| **redis** | `agent-valkey` | `valkey/valkey-bundle:9.1.3` | 6379 | Conversation state, browser sessions, SSE event bus, artifact catalog, task graph, caches |
 | **agents/\*** | per agent | `agents/<name>/docker-compose.yml` | — (8008 artifact-debug) | Included automatically by `make generate` |
 
 {.tiny}

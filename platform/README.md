@@ -104,6 +104,8 @@ echo "LOCAL_SDK=true" >> .env
 
 `make up` (and `make build`, `make ng-up`) then first runs `make base-image`, which builds `prometheus_api:local` from `../sdk` for your machine's architecture, and builds every service `FROM` it. The pinned `PROMETHEUS_API_BASE_IMAGE_HASH` is ignored; you get whatever SDK is checked out next to the platform. After pulling SDK changes, the next `make up` rebuilds it (Docker's cache keeps that fast when nothing changed).
 
+The SDK base image, the backend and the frontend import the registry build cache that CI publishes (`amd64` or `arm64`, from your machine), so a first build reuses layers instead of rebuilding them. The agent images aren't published, so they still build locally. Importing a registry cache needs Docker's containerd image store (the default in recent Docker Desktop); if your builds ignore it, enable it under Settings → General. To build without the cache, for example when offline, set `USE_BUILD_CACHE=false` in `.env` or on the command line. A fork can point `BUILD_CACHE` at its own cache prefix.
+
 #### Option B: pull it from the container registry
 
 The `prometheus_api` base image is pulled from INL's Github with a [PAT](https://github.inl.gov/settings/tokens/new):
@@ -140,7 +142,7 @@ detached container with no output.
 ```
 NAME                  IMAGE                                     SERVICE               STATUS
 admin-db              postgres:16-alpine                        admin-db              Up (healthy)
-agent-valkey          valkey/valkey-bundle:9.1.0                 redis                 Up
+agent-valkey          valkey/valkey-bundle:9.1.3                 redis                 Up
 backend               prometheus_platform-backend                backend               Up (healthy)
 client-agent          prometheus_platform-client-agent           client-agent          Up (healthy)
 form-filler-agent     prometheus_platform-form-filler-agent      form-filler-agent     Up (healthy)

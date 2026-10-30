@@ -12,7 +12,7 @@
 
 import path from "path";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import tailwindcss from "@tailwindcss/vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
@@ -26,7 +26,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   // mermaid is only reachable through a nested dynamic import inside a lazily
@@ -42,6 +42,32 @@ export default defineConfig({
   // their dynamic imports in DEV, which puts them in the initial scan already.
   optimizeDeps: {
     include: ["mermaid"],
+  },
+  test: {
+    // Off by default; `npm run test:coverage` turns it on. Every source file
+    // counts, tested or not, so the total reflects the whole app
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/**/*.d.ts"],
+      reporter: ["text-summary", "json-summary", "cobertura"],
+    },
+    // Logic tests (*.test.ts) run in Node; component tests (*.test.tsx) get a DOM
+    projects: [
+      {
+        extends: true,
+        test: { name: "unit", environment: "node", include: ["src/**/*.test.ts"] },
+      },
+      {
+        extends: true,
+        test: {
+          name: "component",
+          environment: "jsdom",
+          include: ["src/**/*.test.tsx"],
+          setupFiles: ["src/test/setup.ts"],
+        },
+      },
+    ],
   },
   server: {
     port: 5150,

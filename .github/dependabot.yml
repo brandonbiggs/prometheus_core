@@ -67,8 +67,9 @@ updates:
       actions:
         patterns: ["*"]
 
-  # The frontend's package.json and package-lock.json. npm ci in CI fails a
-  # stale lockfile
+  # The React frontend. Majors are ignored: they can change how the app builds
+  # or renders (Vite, React, the viewers' libraries), so they're upgraded by
+  # hand with a check of the app. Security updates still arrive for any version
   - package-ecosystem: npm
     directory: /platform/frontend
     schedule:
@@ -76,9 +77,11 @@ updates:
     target-branch: devel
     cooldown:
       default-days: 7
-    versioning-strategy: increase
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
     groups:
-      frontend:
+      npm:
         patterns: ["*"]
         update-types: [minor, patch]
 
