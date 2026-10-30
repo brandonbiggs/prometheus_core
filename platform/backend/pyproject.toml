@@ -5,7 +5,7 @@ description = "Standalone FastAPI backend (replaces Chainlit's server role)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.160.0",
+    "fastapi>=0.161.1",
     "python-multipart>=0.0.9",  # required for form-encoded POST /api/auth/login
     "uvicorn[standard]>=0.54.0",
     "pydantic-settings>=2.16.1",
