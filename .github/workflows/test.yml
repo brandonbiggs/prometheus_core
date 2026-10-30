@@ -831,6 +831,7 @@ jobs:
       # Placeholders for the variables .env sets. config only interpolates them
       AGENT_SECRET: placeholder
       LITELLM_MASTER_KEY: placeholder
+      LLM_CONFIG_PROFILE: placeholder
       REDIS_PASSWORD: placeholder
     steps:
       - name: Checkout
