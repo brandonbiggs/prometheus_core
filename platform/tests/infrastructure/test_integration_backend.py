@@ -33,9 +33,9 @@ def backend_base_url(docker_compose_up, env_test_file):
     return f"http://localhost:{port}"
 
 
-def test_backend_container_running(docker_compose_up):
+def test_backend_container_running(docker_compose_up, container_id):
     result = subprocess.run(
-        ["docker", "inspect", "--format", "{{.State.Status}}", "backend"],
+        ["docker", "inspect", "--format", "{{.State.Status}}", container_id("backend")],
         capture_output=True,
         text=True,
     )

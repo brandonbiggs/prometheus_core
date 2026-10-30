@@ -38,21 +38,21 @@ def _docker_inspect_health(container_name: str) -> str:
     return result.stdout.strip()
 
 
-def test_postgres_container_running(docker_compose_up):
-    assert _docker_inspect_status("admin-db") == "running"
+def test_postgres_container_running(docker_compose_up, container_id):
+    assert _docker_inspect_status(container_id("admin-db")) == "running"
 
 
-def test_postgres_healthy(docker_compose_up):
-    assert _docker_inspect_health("admin-db") == "healthy"
+def test_postgres_healthy(docker_compose_up, container_id):
+    assert _docker_inspect_health(container_id("admin-db")) == "healthy"
 
 
-def test_postgres_accepts_connection(docker_compose_up):
+def test_postgres_accepts_connection(docker_compose_up, container_id):
     """Connect to PostgreSQL and run a simple query."""
     result = subprocess.run(
         [
             "docker",
             "exec",
-            "admin-db",
+            container_id("admin-db"),
             "psql",
             "-U",
             "admin",
@@ -67,12 +67,12 @@ def test_postgres_accepts_connection(docker_compose_up):
     assert result.returncode == 0, f"psql failed: {result.stderr}"
 
 
-def test_postgres_admin_database_exists(docker_compose_up):
+def test_postgres_admin_database_exists(docker_compose_up, container_id):
     result = subprocess.run(
         [
             "docker",
             "exec",
-            "admin-db",
+            container_id("admin-db"),
             "psql",
             "-U",
             "admin",
@@ -88,12 +88,12 @@ def test_postgres_admin_database_exists(docker_compose_up):
     assert "admin" in result.stdout
 
 
-def test_postgres_admin_user_exists(docker_compose_up):
+def test_postgres_admin_user_exists(docker_compose_up, container_id):
     result = subprocess.run(
         [
             "docker",
             "exec",
-            "admin-db",
+            container_id("admin-db"),
             "psql",
             "-U",
             "admin",

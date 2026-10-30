@@ -39,9 +39,9 @@ def redis_client(docker_compose_up, env_test_file):
     client.close()
 
 
-def test_valkey_container_running(docker_compose_up):
+def test_valkey_container_running(docker_compose_up, container_id):
     result = subprocess.run(
-        ["docker", "inspect", "--format", "{{.State.Status}}", "agent-valkey"],
+        ["docker", "inspect", "--format", "{{.State.Status}}", container_id("redis")],
         capture_output=True,
         text=True,
     )

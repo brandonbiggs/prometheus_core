@@ -12,6 +12,7 @@
 
 """Shared fixtures for infrastructure tests."""
 
+import os
 import re
 import subprocess
 import time
@@ -99,6 +100,35 @@ def compose_var_refs(compose_path: Path) -> list[tuple[str, bool]]:
 # Integration test fixtures
 # ---------------------------------------------------------------------------
 
+# The compose project the stack under test runs as. Matches the root Makefile's
+# default, so a stack from ``make up`` is found without any extra setup.
+COMPOSE_PROJECT_NAME = os.environ.get("COMPOSE_PROJECT_NAME", "prometheus_platform")
+
+
+def _container_id(service: str) -> str:
+    """Return the ID of the compose project's container for ``service``.
+
+    Services have no fixed container_name (so stacks from different checkouts
+    can run side by side), so containers are found by their compose labels.
+    Falls back to the service name, so a docker command on it fails cleanly.
+    """
+    result = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "--all",
+            "--quiet",
+            "--filter",
+            f"label=com.docker.compose.project={COMPOSE_PROJECT_NAME}",
+            "--filter",
+            f"label=com.docker.compose.service={service}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    ids = result.stdout.split()
+    return ids[0] if ids else service
+
 
 def _docker_available() -> bool:
     """Check if Docker CLI is available and the daemon is running."""
@@ -113,12 +143,12 @@ def _docker_available() -> bool:
         return False
 
 
-def _wait_for_container_healthy(container_name: str, timeout: int = 120) -> bool:
-    """Poll docker inspect until container is healthy or timeout expires."""
+def _wait_for_container_healthy(service: str, timeout: int = 120) -> bool:
+    """Poll docker inspect until the service's container is healthy or timeout expires."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.State.Health.Status}}", container_name],
+            ["docker", "inspect", "--format", "{{.State.Health.Status}}", _container_id(service)],
             capture_output=True,
             text=True,
         )
@@ -132,12 +162,12 @@ def _wait_for_container_healthy(container_name: str, timeout: int = 120) -> bool
     return False
 
 
-def _wait_for_container_running(container_name: str, timeout: int = 60) -> bool:
-    """Poll until container is running or timeout expires."""
+def _wait_for_container_running(service: str, timeout: int = 60) -> bool:
+    """Poll until the service's container is running or timeout expires."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         result = subprocess.run(
-            ["docker", "inspect", "--format", "{{.State.Status}}", container_name],
+            ["docker", "inspect", "--format", "{{.State.Status}}", _container_id(service)],
             capture_output=True,
             text=True,
         )
@@ -147,10 +177,10 @@ def _wait_for_container_running(container_name: str, timeout: int = 60) -> bool:
     return False
 
 
-def _inspect_container(container_name: str, format_string: str) -> str:
-    """Return a docker inspect formatted field, or empty string on error."""
+def _inspect_container(service: str, format_string: str) -> str:
+    """Return a docker inspect formatted field of the service's container, or empty string on error."""
     result = subprocess.run(
-        ["docker", "inspect", "--format", format_string, container_name],
+        ["docker", "inspect", "--format", format_string, _container_id(service)],
         capture_output=True,
         text=True,
     )
@@ -159,10 +189,10 @@ def _inspect_container(container_name: str, format_string: str) -> str:
     return result.stdout.strip()
 
 
-def _get_container_logs(container_name: str, tail: int = 80) -> str:
-    """Return recent docker logs for debugging setup failures."""
+def _get_container_logs(service: str, tail: int = 80) -> str:
+    """Return the service container's recent docker logs for debugging setup failures."""
     result = subprocess.run(
-        ["docker", "logs", "--tail", str(tail), container_name],
+        ["docker", "logs", "--tail", str(tail), _container_id(service)],
         capture_output=True,
         text=True,
     )
@@ -223,11 +253,17 @@ def _run_compose_or_fail(
 
 
 @pytest.fixture(scope="session")
+def container_id():
+    """Look up the stack's container ID for a compose service name."""
+    return _container_id
+
+
+@pytest.fixture(scope="session")
 def running_stack() -> bool:
     """Whether a platform stack (e.g. from ``make up``) is already running.
 
-    The compose services have fixed container names, so a second stack can't
-    start next to it; the integration tests use the running one instead.
+    The test stack would run as the same compose project, so it can't start
+    next to it; the integration tests use the running one instead.
     """
     return _docker_available() and _inspect_container("backend", "{{.State.Status}}") == "running"
 
@@ -311,6 +347,8 @@ def docker_compose_up(project_root: Path, env_test_file: Path, test_ports: dict[
     compose_cmd = [
         "docker",
         "compose",
+        "-p",
+        COMPOSE_PROJECT_NAME,
         "-f",
         "docker-compose.yml",
         "--env-file",
@@ -334,17 +372,17 @@ def docker_compose_up(project_root: Path, env_test_file: Path, test_ports: dict[
         # Enforce readiness checks with actionable diagnostics on failure.
         core_readiness_checks = [
             ("admin-db", "healthy", _wait_for_container_healthy, 90),
-            ("agent-valkey", "running", _wait_for_container_running, 60),
+            ("redis", "running", _wait_for_container_running, 60),
         ]
-        for container_name, expected_state, wait_fn, timeout in core_readiness_checks:
-            if wait_fn(container_name, timeout=timeout):
+        for service, expected_state, wait_fn, timeout in core_readiness_checks:
+            if wait_fn(service, timeout=timeout):
                 continue
 
-            status = _inspect_container(container_name, "{{.State.Status}}")
-            health = _inspect_container(container_name, "{{if .State.Health}}{{.State.Health.Status}}{{end}}")
-            logs = _get_container_logs(container_name)
+            status = _inspect_container(service, "{{.State.Status}}")
+            health = _inspect_container(service, "{{if .State.Health}}{{.State.Health.Status}}{{end}}")
+            logs = _get_container_logs(service)
             pytest.fail(
-                f"Container {container_name} did not become {expected_state} within {timeout}s.\n"
+                f"Service {service} did not become {expected_state} within {timeout}s.\n"
                 f"State={status or '<unknown>'}, Health={health or '<none>'}\n"
                 f"Recent logs:\n{logs}"
             )
@@ -361,15 +399,15 @@ def docker_compose_up(project_root: Path, env_test_file: Path, test_ports: dict[
             ("backend", "running", _wait_for_container_running, 180),
             ("client-agent", "running", _wait_for_container_running, 120),
         ]
-        for container_name, expected_state, wait_fn, timeout in app_readiness_checks:
-            if wait_fn(container_name, timeout=timeout):
+        for service, expected_state, wait_fn, timeout in app_readiness_checks:
+            if wait_fn(service, timeout=timeout):
                 continue
 
-            status = _inspect_container(container_name, "{{.State.Status}}")
-            health = _inspect_container(container_name, "{{if .State.Health}}{{.State.Health.Status}}{{end}}")
-            logs = _get_container_logs(container_name)
+            status = _inspect_container(service, "{{.State.Status}}")
+            health = _inspect_container(service, "{{if .State.Health}}{{.State.Health.Status}}{{end}}")
+            logs = _get_container_logs(service)
             pytest.fail(
-                f"Container {container_name} did not become {expected_state} within {timeout}s.\n"
+                f"Service {service} did not become {expected_state} within {timeout}s.\n"
                 f"State={status or '<unknown>'}, Health={health or '<none>'}\n"
                 f"Recent logs:\n{logs}"
             )
