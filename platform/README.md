@@ -140,16 +140,14 @@ detached container with no output.
 `make ps` once everything is healthy looks like:
 
 ```
-NAME                  IMAGE                                     SERVICE               STATUS
-admin-db              postgres:16-alpine                        admin-db              Up (healthy)
-agent-valkey          valkey/valkey-bundle:9.1.3                 redis                 Up
-backend               prometheus_platform-backend                backend               Up (healthy)
-client-agent          prometheus_platform-client-agent           client-agent          Up (healthy)
-form-filler-agent     prometheus_platform-form-filler-agent      form-filler-agent     Up (healthy)
-frontend-dev          prometheus_platform-frontend-dev           frontend-dev          Up
-litellm-db            postgres:16-alpine                         litellm-db            Up (healthy)
-litellm-proxy         ghcr.io/berriai/litellm:v1.92.0            litellm               Up (healthy)
-synthesis-agent       prometheus_platform-synthesis-agent        synthesis-agent       Up (healthy)
+NAME                                    IMAGE                                     SERVICE               STATUS
+prometheus_platform-admin-db-1          postgres:16-alpine                        admin-db              Up (healthy)
+prometheus_platform-backend-1           prometheus_platform-backend               backend               Up (healthy)
+prometheus_platform-client-agent-1      prometheus_platform-client-agent          client-agent          Up (healthy)
+prometheus_platform-form-filler-agent-1 prometheus_platform-form-filler-agent     form-filler-agent     Up (healthy)
+prometheus_platform-frontend-dev-1      prometheus_platform-frontend-dev          frontend-dev          Up
+prometheus_platform-redis-1             valkey/valkey-bundle:9.1.3                redis                 Up
+prometheus_platform-synthesis-agent-1   prometheus_platform-synthesis-agent       synthesis-agent       Up (healthy)
 ```
 
 Services and host ports:

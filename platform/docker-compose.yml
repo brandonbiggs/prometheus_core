@@ -72,7 +72,6 @@ services:
   # OIDC provider config, RS256 signing keys).
   admin-db:
     image: postgres:16.15-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
-    container_name: admin-db
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: ${ADMIN_DB_PASSWORD}
@@ -92,7 +91,6 @@ services:
   # The service name stays "redis" so existing REDIS_URL values keep working.
   redis:
     image: valkey/valkey-bundle:9.1.3@sha256:dd30c59c2b2a598e83308095220a31d6d93d64c40a839c702cb1e98c8e220660
-    container_name: agent-valkey
     command: ["valkey-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
     ports:
       - "${REDIS_LOCAL_PORT:-6379}:6379"
@@ -110,7 +108,6 @@ services:
       context: ./agents/client-agent
       args:
         <<: *prometheus-api-build-args
-    container_name: client-agent
     extra_hosts: *host-gateway
     networks:
       - agent-network
@@ -151,7 +148,6 @@ services:
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-}
-    container_name: backend
     extra_hosts: *host-gateway
     ports:
       # Keep the default in sync with BACKEND_PORT in the Makefile (make check)
@@ -230,7 +226,6 @@ services:
       target: dev
       additional_contexts:
         certs: ../common/certs
-    container_name: frontend-dev
     extra_hosts: *host-gateway
     ports:
       # Keep the default in sync with FRONTEND_DEV_PORT in the Makefile (make check)
@@ -260,7 +255,6 @@ services:
       target: prod
       additional_contexts:
         certs: ../common/certs
-    container_name: frontend-prod
     extra_hosts: *host-gateway
     ports:
       # Keep the default in sync with FRONTEND_PROD_PORT in the Makefile (make check)

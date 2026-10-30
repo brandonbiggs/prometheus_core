@@ -125,7 +125,7 @@ Two contracts sit back to back. The **React frontend ↔ backend** wire contract
 
 ## Service map (default ports)
 
-| Service | Container | Host port | Notes |
+| Service | Compose service | Host port | Notes |
 |---------|-----------|-----------|-------|
 | React frontend (dev) | `frontend-dev` | 5150 (`FRONTEND_DEV_PORT`) | Vite dev server; compose profile `dev` |
 | React frontend (prod) | `frontend-prod` | 8080 (`FRONTEND_PROD_PORT`) | nginx-served build; compose profile `prod` |
@@ -133,10 +133,10 @@ Two contracts sit back to back. The **React frontend ↔ backend** wire contract
 | Client agent | `client-agent` | 8001 (`CLIENT_AGENT_PORT`) | Container port 8000 |
 | LiteLLM proxy | `litellm-proxy` | `LITELLM_LOCAL_PORT` (e.g. 9977) | Gateway + LLM proxy |
 | LiteLLM Postgres | `litellm-db` | (internal) | Persistent agent registrations |
-| Valkey | `agent-valkey` | 6379 (`REDIS_LOCAL_PORT`) | Auth via `REDIS_PASSWORD` |
-| Specialist agents | per-agent containers | 8002–8009 typically | Each on container port 8000 |
+| Valkey | `redis` | 6379 (`REDIS_LOCAL_PORT`) | Auth via `REDIS_PASSWORD` |
+| Specialist agents | per-agent services | 8002–8009 typically | Each on container port 8000 |
 
-All services share the `agent-network` bridge.
+All services share the `agent-network` bridge. No service sets `container_name`, so stacks from different checkouts can run side by side (with a distinct `COMPOSE_PROJECT_NAME` and host ports); use `docker compose exec <service>` rather than `docker exec <name>`.
 
 ## Conventions worth knowing
 

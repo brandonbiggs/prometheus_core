@@ -8,7 +8,6 @@ services:
         - HTTP_PROXY=${HTTP_PROXY:-}
         - HTTPS_PROXY=${HTTPS_PROXY:-}
         - NO_PROXY=${NO_PROXY:-}
-    container_name: artifact-debug-agent
     extra_hosts:
       - "prometheus.host.internal:host-gateway"
     ports:

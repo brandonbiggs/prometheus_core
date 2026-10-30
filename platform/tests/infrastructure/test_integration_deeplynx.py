@@ -24,8 +24,6 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-SERVER = "prometheus_platform-deeplynx-server-1"
-
 # Store an item and a file in DeepLynx and read both back
 ROUND_TRIP = """
 import pathlib, tempfile
@@ -55,31 +53,31 @@ def _status(container: str, field: str) -> str:
 
 
 @pytest.fixture
-def local_deeplynx(docker_compose_up):
+def local_deeplynx(docker_compose_up, container_id):
     """Skip unless the local DeepLynx is running."""
-    if _status(SERVER, "{{.State.Status}}") != "running":
+    if _status(container_id("deeplynx-server"), "{{.State.Status}}") != "running":
         pytest.skip("the local DeepLynx isn't running (LOCAL_DEEPLYNX=true)")
 
 
-def test_deeplynx_server_healthy(local_deeplynx):
+def test_deeplynx_server_healthy(local_deeplynx, container_id):
     """deeplynx-server passes its healthcheck."""
-    assert _status(SERVER, "{{.State.Health.Status}}") == "healthy"
+    assert _status(container_id("deeplynx-server"), "{{.State.Health.Status}}") == "healthy"
 
 
-def test_backend_points_at_local_deeplynx(local_deeplynx):
+def test_backend_points_at_local_deeplynx(local_deeplynx, container_id):
     """make deeplynx-setup pointed the backend at deeplynx-server."""
     result = subprocess.run(
-        ["docker", "exec", "backend", "printenv", "DEEPLYNX_BASE_URL"],
+        ["docker", "exec", container_id("backend"), "printenv", "DEEPLYNX_BASE_URL"],
         capture_output=True,
         text=True,
     )
     assert result.stdout.strip() == "http://deeplynx-server:5000/api/v1"
 
 
-def test_storage_round_trip(local_deeplynx):
+def test_storage_round_trip(local_deeplynx, container_id):
     """The platform's storage client can store and read back an item and a file."""
     result = subprocess.run(
-        ["docker", "exec", "backend", "python", "-c", ROUND_TRIP],
+        ["docker", "exec", container_id("backend"), "python", "-c", ROUND_TRIP],
         capture_output=True,
         text=True,
         timeout=120,
