@@ -1023,7 +1023,7 @@ jobs:
     # Skip the slow start when a compose file doesn't even parse
     needs: [gitleaks, platform-compose]
     runs-on: ubuntu-26.04
-    timeout-minutes: 60
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: platform
@@ -1150,7 +1150,7 @@ jobs:
     # Skip the slow start when a compose file doesn't even parse
     needs: [gitleaks, platform-compose]
     runs-on: ubuntu-26.04
-    timeout-minutes: 60
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: platform
