@@ -1,12 +1,61 @@
 # Local DeepLynx install
 
-## Clone the DeepLynx repository
+The platform stores agent artifacts in DeepLynx. Instead of a shared DeepLynx
+server, you can run one next to the platform, either from the published images
+(the quickest way) or built from the DeepLynx source.
+
+## With the platform, from the published images
+
+DeepLynx publishes its server and web UI as images under
+`ghcr.io/idaholab/deeplynx/`. With `LOCAL_DEEPLYNX=true` the platform starts
+them alongside everything else (`docker-compose.deeplynx.yml`) and configures
+itself to use them, so there is nothing to build or click through:
+
+```
+cd platform
+echo "LOCAL_DEEPLYNX=true" >> .env
+make up
+```
+
+Before the rest of the platform starts, every start target (`make up`,
+`make restart`, ...) runs `make deeplynx-setup`, which
+
+- starts DeepLynx's database, server and web UI and waits until they're up,
+- creates a project named "Prometheus" in the default organization and an API
+  key for it, through the DeepLynx API, and
+- saves them in `.env`: `DEEPLYNX_BASE_URL=http://deeplynx-server:5000/api/v1`
+  (the server on the platform's network), `DEEPLYNX_KEY`, `DEEPLYNX_SECRET`,
+  `DEEPLYNX_ORG_ID` and `DEEPLYNX_PROJECT_ID`. Any DeepLynx settings already in
+  `.env` are replaced.
+
+Once that key works it is kept, so later starts change nothing. `make down-v`
+deletes DeepLynx's data along with the platform's, and the next start sets it
+up again.
+
+The web UI is at http://localhost:3000 and the API at
+http://localhost:5000/api/v1. Both run with authentication disabled, as the
+"Local Developer" user, so this is for local use only. `DEEPLYNX_UI_PORT` and
+`DEEPLYNX_SERVER_PORT` move them to other host ports, but the UI only works
+with the API on port 5000: the browser's API address is built into the UI
+image. The images don't include DeepLynx's optional document ingestion
+service (Insight).
+
+The image tag is pinned in `docker-compose.deeplynx.yml`. The images are built
+from DeepLynx releases by the `build-images` workflow in the DeepLynx
+repository.
+
+## On its own, built from source
+
+To run DeepLynx separately from the platform, for example to work on DeepLynx
+itself, build it from its repository and set the platform up by hand.
+
+### Clone the DeepLynx repository
 
 ```
 git clone https://github.com/idaholab/DeepLynx.git
 ```
 
-## Build the docker containers
+### Build the docker containers
 
 ```
 cd DeepLynx
@@ -14,7 +63,7 @@ cp .env_sample .env
 docker compose build
 ```
 
-## Start DeepLynx
+### Start DeepLynx
 
 ```
 docker compose up
@@ -22,7 +71,7 @@ docker compose up
 
 This starts two services: the **web UI** (admin GUI) at http://localhost:3000/, which you use for the setup steps below, and the **API** at http://localhost:5000/api/v1, which the Prometheus platform talks to.
 
-## Set up a project
+### Set up a project
 
 When you open [DeepLynx](http://localhost:3000/) you are greeted with a quick tour. Take it or skip it.
 ![DeepLynx welcome screen with the introductory quick tour](images/deeplynx_1.png)
@@ -47,7 +96,7 @@ On the Settings page scroll down to the "API Keys" section and click "+ Generate
 
 A popup will appear with a _key_ and a _secret_ — copy both now. This is the only time you will be able to see the secret!
 
-## Configure the platform to use the local DeepLynx
+### Configure the platform to use the local DeepLynx
 
 As noted above, the API (not the web UI on port 3000) is exposed on the host at http://0.0.0.0:5000/api/v1. From inside the Prometheus platform containers that host is available as `prometheus.host.internal` (mapped to Docker's host gateway on macOS and Linux alike), so set
 

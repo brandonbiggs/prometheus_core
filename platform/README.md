@@ -269,6 +269,7 @@ Notable environment variables (see `.env.example` for the full list):
 | `LLM_CONFIG_FILE` | Optional custom YAML path inside the agent container; overrides `LLM_CONFIG_PROFILE` |
 | `DEBUG_AGENTS` | When `true`, also build and start the mock agents in `agents/debug-agents/` |
 | `OPTIONAL_AGENTS` | When `true`, also build and start the heavy agents in `agents/optional/` (OSTI research; its PDF/ML dependencies make it the slowest image to build) |
+| `LOCAL_DEEPLYNX` | When `true`, also start DeepLynx from its published images and point the `DEEPLYNX_*` settings at it ([Local DeepLynx install](docs/docs/local-deeplynx.md)) |
 | `PROMETHEUS_SYSTEM_TESTING` | When `true`, Make includes the Compose override that publishes the client-agent on `CLIENT_AGENT_PORT` |
 | Provider API keys | Credentials referenced by the selected profile; see `.env.example` |
 | `AGENT_SECRET_REQUIRED` | Enforce Bearer auth on specialist agents (default `true`) |
@@ -277,7 +278,9 @@ Notable environment variables (see `.env.example` for the full list):
 
 ### DeepLynx storage
 
-DeepLynx configuration is required for standard agent execution records. Set either `DEEPLYNX_JWT_TOKEN` or both `DEEPLYNX_KEY` and `DEEPLYNX_SECRET`, together with `DEEPLYNX_ORG_ID` and `DEEPLYNX_PROJECT_ID`. `DEEPLYNX_BASE_URL` is optional and uses the SDK default when omitted. `DEEPLYNX_DATA_SOURCE_ID` is also optional when the project has a default data source. Instructions to configure a local DeepLynx server can be found [here](docs/docs/local-deeplynx.md).
+DeepLynx configuration is required for standard agent execution records. Set either `DEEPLYNX_JWT_TOKEN` or both `DEEPLYNX_KEY` and `DEEPLYNX_SECRET`, together with `DEEPLYNX_ORG_ID` and `DEEPLYNX_PROJECT_ID`. `DEEPLYNX_BASE_URL` is optional and uses the SDK default when omitted. `DEEPLYNX_DATA_SOURCE_ID` is also optional when the project has a default data source.
+
+To run DeepLynx locally instead, set `LOCAL_DEEPLYNX=true`: `make up` then also starts DeepLynx from its published images and fills in these settings for it. See [Local DeepLynx install](docs/docs/local-deeplynx.md), which also covers building DeepLynx from source.
 
 ### Optional integrations (work in progress)
 
