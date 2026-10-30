@@ -78,7 +78,7 @@ def request(method: str, url: str, body: dict | None = None) -> tuple[int, objec
         return status, None
 
 
-def wait_healthy(api: str, timeout: float) -> bool:
+def wait_healthy(api: str, timeout: float, interval: float = 2) -> bool:
     """Whether the server reports healthy within ``timeout`` seconds."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -88,7 +88,7 @@ def wait_healthy(api: str, timeout: float) -> bool:
                 return True
         except (urllib.error.URLError, OSError):
             pass
-        time.sleep(2)
+        time.sleep(interval)
     return False
 
 
