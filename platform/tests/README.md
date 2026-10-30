@@ -32,10 +32,23 @@ running stack first if you want the fixture's own one.
 The `platform: up` job in `.github/workflows/test.yml` runs this suite. It runs
 `make up LOCAL_SDK=true`, which waits for every healthcheck and for every
 agent to register with LiteLLM, then runs `make test-integration` against that
-stack and always runs `make down-v`. If the job fails, the container logs (one
-file per service plus a combined one) are uploaded as the
+stack. It then runs the other start targets against the stack (`make restart`,
+`make ng-restart`, `make down` then `make restart`, and `make down-v` then
+`make up`), checks that `.env` is unchanged after each, runs the integration
+tests again, and always runs `make down-v`. If the job fails, the container
+logs (one file per service plus a combined one) are uploaded as the
 `platform-up-logs` artifact. It runs on every pull request and every push to
 `devel`, like the rest of the workflow; the whole job takes a few minutes.
+
+The `platform: up deeplynx` job does the same with `LOCAL_DEEPLYNX=true`
+(see `../docs/docs/local-deeplynx.md`), with only the default agents and no
+frontend: DeepLynx runs next to the platform from its published images, and
+`make deeplynx-setup` gives the services a real project and API key for it.
+`test_integration_deeplynx.py` stores an item and a file through the backend's
+storage client and reads them back; without the local DeepLynx those tests are
+skipped. Across the start targets, the DeepLynx settings in `.env` have to be
+kept until `make down-v` and replaced after it. Its logs are uploaded as
+`platform-up-deeplynx-logs`.
 
 ### No real LLM or DeepLynx credentials
 
@@ -49,7 +62,9 @@ does either, so CI sets **stub credentials** instead of using secrets:
   endpoints, so they never send a completion.
 - `DEEPLYNX_KEY`, `DEEPLYNX_SECRET`, `DEEPLYNX_ORG_ID` and
   `DEEPLYNX_PROJECT_ID` with placeholder values. Agents check at startup that
-  DeepLynx is configured but don't connect until an artifact is stored.
+  DeepLynx is configured but don't connect until an artifact is stored. In
+  `platform: up deeplynx` they are real, for the local DeepLynx, and need
+  no secrets either.
 
 That makes these tests safe to run on pull requests from forks, which get no
 repository secrets. A test that does need a model response would need a mock

@@ -1,6 +1,6 @@
 # Stale docs: what older docs say, and what the code does now
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 Trust the code, and tell a mentor (deck 01, slide 12 and A18-A19; deck 04, A3).
 
@@ -14,7 +14,8 @@ Trust the code, and tell a mentor (deck 01, slide 12 and A18-A19; deck 04, A3).
 | Base image from `mooseharbor`, pinned in compose | From `containers.github.inl.gov`, pinned in the platform `Makefile:22` |
 | `PROMETHEUS_DEBUG`, `planner.py`, the pin `2b3dbcf` (v0.8.0) | `DEBUG_AGENTS=true`; `orchestrator/agent_loop.py`; the pin `95c32b5` |
 | A workflow YAML with no `description` | `description` is required (`workflow_library/schema.py:75`) |
-| `/v1/agents` with no key, or piped to `json.tool` (decks 03-05) | It needs the master key and prints each `AGENT_SECRET`: print names only (`conventions.md`) |
+| LiteLLM on `:9977`, `LITELLM_MASTER_KEY`, `litellm_config.yaml`, "Admin › Signing Keys → generate" | The backend on `:8600` is the registry and gateway (`Bearer $AGENT_SECRET`); no LLM proxy; the signing key is automatic |
+| `get_provided_inputs`, `MissingInput(sensitive=…)`, `with_api_key(LITELLM_MASTER_KEY)` | answers in `params`; no `sensitive`; plain `self.llm_client(context)` |
 | `setup_agent.py --help` shows arguments | `main()` ignores them; it is interactive only (`setup_agent.py:389-400`) |
 | Host run with `AGENT_SECRET_REQUIRED=false` only | Also `USER_IDENTITY_REQUIRED=false`, else "No 'userToken' found" |
 
@@ -27,7 +28,8 @@ Deck 03, A11 and deck 04, slide 19 say it does. It does not: the status lines go
 (`agents/client-agent/orchestrator/runtime.py:139-161`). The log shows discovery prints and errors.
 Read the turn from Valkey, or run `/diagnose trace my last chat`.
 
-## The `small` flavor and the `anl_asksage` profile
+## The `registry` profile
 
-Deck 04, slides 15-16 use `small`, but `registry` defines only `medium` (`litellm_config.yaml:6-10`): `small`
-raises `LLMAliasError`. `anl_asksage` (deck 03, slide 8) is not in the SDK at the pin. More in `llm.md`.
+Old docs and the template before the fix default `LLM_CONFIG_PROFILE` to `registry`, which sent LLM calls to
+`REGISTRY_URL`. That is now the backend's agent registry, not an LLM proxy: `make init-env` rejects it and
+the platform compose stops while the profile is empty. Every other profile defines all flavors. More in `llm.md`.

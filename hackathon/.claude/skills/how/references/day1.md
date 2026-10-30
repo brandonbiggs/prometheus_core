@@ -1,6 +1,6 @@
 # Day 1: the hello-world agent
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 Four parts (deck 05, slide 1). You are done when `/agents` lists your agent, the chat returns your greeting, and
 your PR is approved. With Claude Code, `/diagnose` checks the laptop, and `/create-agent` does steps 2 to 4.
@@ -12,7 +12,7 @@ with the same card name replaces yours (`registry.py:123-130`). Keep the four cl
 ## Step 1. Check the platform
 
 Run `git pull`, `make up`, `make ps`, `curl -s localhost:8600/healthz`, and the names-only `/v1/agents` command
-(`conventions.md`; deck 05, slide 2). At `http://localhost:5150`, run the wizard, then activate a signing key.
+(`conventions.md`; deck 05, slide 2). At `http://localhost:5150`, run the wizard (the signing key is created for you).
 
 ## Step 2. Scaffold the agent
 
@@ -26,8 +26,8 @@ by name on behalf of <You>.`; skill id `hello_<you>_greeting`; skill name `Hello
    greet someone, or says hello to <You>. Not for any other task.`; one required string `person_name` (`card.md`).
 2. `_execute` returns `{"status": "success", "greeting": f"Hello, {name}, from <You>!"}`, or an error dict
    without `person_name` (`agent-code.md`). Update the two tests (`testing.md`).
-3. Add `PROMETHEUS_API_BASE_IMAGE_HASH=<pin>` to the agent `.env` (`environment.md`).
-4. Run `uv sync`, `uv pip install "git+https://github.inl.gov/genesis/prometheus_api.git@<pin>"`, `uv run pytest`,
+3. Check that the agent `.env` has `LOCAL_SDK=true`, `LLM_CONFIG_PROFILE` and the `DEEPLYNX_*` lines (`environment.md`).
+4. Run `uv sync` (creates `uv.lock`; commit it), `uv pip install <platform>/../sdk`, `uv run pytest`,
    `uv run ruff check .`.
 
 ## Step 4. Run it and see it routed

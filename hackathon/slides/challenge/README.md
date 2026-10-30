@@ -34,13 +34,13 @@ The new files follow the same conventions as the practice file: GitHub-flavoured
 3. Registers with your local platform; visible under `/agents`.
 4. Natural-language requests in the chat are **routed by the orchestrator** to the right skill.
 5. The extract skill emits a table artifact; the plot skill emits an **image** artifact that renders in the chat.
-6. `uv run pytest` and `uv run ruff check .` pass.
+6. `uv.lock` is committed and current; `uv run pytest` and `uv run ruff check .` pass.
 7. The code is in a team repo on github.com owned by one teammate; teammates fork it and open PRs, and every merged PR is reviewed (the owner reviews teammates' PRs, a teammate reviews the owner's).
 
 ## Platform prerequisites
 
-- **DeepLynx must be configured** (local or shared instance). Chat uploads are stored there, and a PNG artifact needs DeepLynx to render (`send_deeplynx_artifact`).
-- Add `matplotlib` (and anything else you import) to your agent's `pyproject.toml`; use the `Agg` backend.
-- LLM calls: pick a provider with `LLM_CONFIG_PROFILE` (`inl_litellm`, `amsc`, or `anl_asksage`) and its key in your agent's `.env`, then use `self.llm_client(context)` with the flavor that fits each call (`small` for cheap classification, `medium`/`large` for matching, `vision` to check a plot).
+- **DeepLynx must be configured** (your local instance, see deck 03) in the platform's and your agent's `.env`. Every agent writes an execution record to DeepLynx and won't start without `DEEPLYNX_*`; chat uploads are stored there, and a PNG artifact needs it to render (`send_deeplynx_artifact`).
+- Add `matplotlib` (and anything else you import) with `uv add matplotlib` and commit `uv.lock` (the image build fails without it); use the `Agg` backend.
+- LLM calls: use the platform's `LLM_CONFIG_PROFILE` (`anthropic`, `openai`, `genesis`, `ollama`, `amsc`, `anl_asksage`, `inl_hpc` or `inl_litellm`) and its key `LLM_API_KEY` in your agent's `.env` (`setup_agent.py` copies both), then use `self.llm_client(context)` with the flavor that fits each call (`small` for cheap classification, `medium`/`large` for matching, `vision` to check a plot).
 
 See the Day 1 decks (`index.html`) for everything else.

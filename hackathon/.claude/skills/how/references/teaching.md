@@ -1,6 +1,6 @@
 # Teaching: the pattern and the check questions
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 ## The teaching pattern
 
@@ -46,24 +46,24 @@ slides 9-10; `prometheus_api/prometheus_api/agent/base.py:1196`, `:1642-1665`; `
 ### input-required
 
 `Input form`. Your skill calls `send_input_required` and returns `{}`. The user fills in the form. What next? A "The
-call continues". B "Local variables stay". C "_execute runs again": answers via `get_provided_inputs`, state via
-`load_context_state`. D "The LLM answers". **C.** The task ends in `TASK_STATE_INPUT_REQUIRED`; the answer comes
-as a new message with the same `contextId`, so save state with `save_context_state` first. Deck 04, slide 12
-and A27-A28; `base.py:975-998`, `:1033-1066`.
+call continues". B "Local variables stay". C "_execute runs again": the answers are merged into `params`.
+D "The LLM answers". **C.** The task ends in `TASK_STATE_INPUT_REQUIRED`; the orchestrator calls again with the
+same `contextId` and the original arguments plus the answers in `params`; local variables are gone. Deck 04,
+"Ask which columns" and appendix; `base.py:1047`, `:1096`.
 
 ### registry-wipe
 
 `Registry`. You ran `make restart` in the platform. `/agents` no longer lists your agent. What now? A "make
 down-v". B "Restart your agent": `docker restart <slug>-agent`. C "Wait a minute". D "Rename the card". **B.** A
-platform `make up` or `restart` deletes the LiteLLM database; your agent registers only at startup. `make down-v`
-also deletes your users and keys. Deck 03, slide 4 and A5; `prometheus_platform/Makefile:232-250`, `:283-301`.
+platform `make up` or `restart` deletes the registrations (`clear-agent-registry`); your agent registers only at
+startup. `make down-v` also deletes your users and keys. Deck 03, "Once, then four commands"; `platform/Makefile`.
 
 ### chat-turn
 
-`Chat turn`. Which path does a chat turn take to your agent? A "Browser to agent". B "Browser to LiteLLM". C
+`Chat turn`. Which path does a chat turn take to your agent? A "Browser to agent". B "Browser to the registry". C
 "Backend to agent". D "Via the orchestrator": the backend hands the turn to the client-agent, whose LLM calls you
-through LiteLLM at `/a2a/<route key>`. **D.** The browser talks only to the backend; LiteLLM forwards with
-`Bearer <AGENT_SECRET>`. Deck 01, slide 9 and A9; `backend/app/a2a_client.py:129`; `client-agent/capability_cache.py:226`.
+through the backend gateway at `/a2a/<route key>`. **D.** The browser talks only to the backend; the backend
+forwards the client-agent's call with `Bearer <AGENT_SECRET>`. Deck 01, slide 9 and A9; `backend/app/a2a_client.py:129`; `client-agent/capability_cache.py:226`.
 
 ### secrets
 

@@ -1,6 +1,6 @@
 # Workflows: chain skills with a YAML file
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 A workflow is a fixed chain of skill calls (deck 04, A37-A38). Put `*.yaml` in `workflows/` (rename the
 template `.example` file); the base class merges it into the card at startup. The LLM sees one tool,

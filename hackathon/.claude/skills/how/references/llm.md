@@ -1,50 +1,54 @@
 # Calling an LLM
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 Your code picks a flavor (`small`, `medium`, `large`, `vision`, `embedding`, `default`). The `.env` profile
 picks the model behind it (deck 04, slides 14-15). Import no provider SDK and hard-code no model ID.
 
 ```python
-cfg = LLMConfig.from_env()  # from prometheus_api.llm_client import LLMConfig
-if cfg.proxy_url:  # only the platform's LiteLLM proxy
-    cfg = cfg.with_api_key(os.getenv("LITELLM_MASTER_KEY"))
-async with self.llm_client(context, config=cfg) as llm:
-    r = await llm.medium(prompt, max_tokens=1800)
+from prometheus_api.llm_client import LLMProviderError
+try:
+    async with self.llm_client(context) as llm:
+        r = await llm.medium(prompt, max_tokens=1800)
+except LLMProviderError as e:  # bad key, quota, provider down; one-line message, no secrets
+    return {"status": "error", "error": str(e)}
 return {"summary": r.text}
 ```
 
-Source: `prometheus_platform/agents/synthesis-agent/agent.py:61-69` (not its `try`/`except`). The `if`
-avoids a 401 from the proxy or the provider.
+`self.llm_client(context)` builds an `AsyncLLMClient` from the environment (`LLM_CONFIG_FILE` or
+`LLM_CONFIG_PROFILE`, key from `LLM_API_KEY`) and calls the provider directly. There is no LLM proxy
+and no key swap: `from_a2a_context` and `with_api_key(LITELLM_MASTER_KEY)` are gone (SDK 0.14).
+Other errors: `LLMConfigError` (unknown profile, lists the installed ones), `LLMEndpointUnavailableError`
+(endpoint unreachable), `LLMAliasError` (flavor not in the profile); all subclass `LLMClientError`.
 
-**Flavors under registry:** the platform defines only `medium` (`prometheus_platform/litellm_config.yaml:6-10`).
-Another flavor raises `LLMAliasError: LLM alias 'small' is not available. Available aliases: medium.` Use
-`medium` (deck 04 slides use `small`). List them:
+**Flavors:** every shipped profile defines `default`, `small`, `medium`, `large`, `vision` (and
+`embedding` where the provider has one). List them for a profile:
 
 ```sh
-set -a; source <platform>/.env; set +a; curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" localhost:9977/v1/models | python3 -c 'import json,sys; print(sorted(m["id"] for m in json.load(sys.stdin)["data"]))'
+grep 'model_name:' <platform>/../sdk/prometheus_api/llm_configs/<profile>.yaml
 ```
 
 **Structured answer** (deck 04, slide 16; `prometheus_api/prometheus_api/llm_client/tools.py:335-352`):
 
 ```python
 PICK = ToolDefinition.from_pydantic("pick_table", Pick, description="Choose the matching table")
-async with self.llm_client(context, config=cfg) as llm:
+async with self.llm_client(context) as llm:
     call = await acall_tool(llm, prompt, tool=PICK, model="medium")  # always pass model=
 pick = Pick.model_validate(call.arguments)  # then check the range
 ```
 
 ## Profile to key map
 
-`LLM_CONFIG_FILE` wins, then `LLM_CONFIG_PROFILE`, else `registry` (`llm_client/config.py:69-109`).
+`LLM_CONFIG_FILE` wins, then `LLM_CONFIG_PROFILE` (`llm_client/config.py`). The platform requires the profile (`make init-env` asks; compose stops when it is empty) and rejects `registry`. `list_llm_config_profiles()` lists the installed ones.
 
 Every profile reads its provider key from `LLM_API_KEY`; the template compose forwards it and
 `EMBEDDING_API_KEY`, and `setup_agent.py` copies both from the platform `.env`.
 
 | profile | `LLM_API_KEY` holds |
 |---|---|
-| `registry` | unused: the agent sends `LITELLM_MASTER_KEY` |
 | `inl_litellm` | the INL LiteLLM key |
+| `genesis` | the Genesis MAG key |
+| `ollama` | nothing: first `ollama cp <model> default` (and `small`, `medium`, `large`, `vision`) |
 | `inl_hpc` | the INL HPC key |
 | `amsc` | the AMSC I2 key |
 | `anthropic` | the Anthropic key (+ `EMBEDDING_API_KEY`) |

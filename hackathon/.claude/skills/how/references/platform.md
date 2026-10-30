@@ -1,6 +1,6 @@
 # The platform: how Prometheus works
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 Prometheus is a chat front door to specialist agents (deck 01, slide 7). An orchestrator picks the agents, the
 order, and the files. You write one agent: a class with `_execute`, and a card.
@@ -9,15 +9,18 @@ order, and the files. You write one agent: a class with `_execute`, and a card.
 
 ```text
 Browser ─:5150─> frontend-dev ─/api/*─> backend (:8600) ─A2A SendStreamingMessage─> client-agent
-client-agent ─POST /a2a/<route key>─> litellm-proxy (:9977) ─Bearer <AGENT_SECRET>─> your agent (:8000)
+client-agent ─POST backend:8000/a2a/<route key>─> backend gateway ─Bearer <AGENT_SECRET>─> your agent (:8000)
 agent-valkey (:6379): conversations, status history, artifact catalog, sessions.  DeepLynx: files.
 ```
 
-Source: `prometheus_platform/docker-compose.yml:60-290`; deck 01, A8. `client-agent` has no host port. `litellm` (container `litellm-proxy`) is the registry, the A2A gateway, and the
-LLM proxy; its database `litellm-db` is deleted by each platform `make up` or `make restart`. `admin-db` holds
-users and signing keys; `redis` (container `agent-valkey`) holds the state. All join
-`prometheus_platform_agent-network`, and so does your agent after `make up`. Inside it, use service names
-(`http://litellm:4000`, `redis://redis:6379`). "Up" in `make ps` only means "started" (deck 03, A10).
+Source: `platform/docker-compose.yml`; deck 01, appendix. `client-agent` has no host port. The `backend` is also the
+agent registry (`/v1/agents`, stored in Valkey under `prometheus:agent-registry`) and the A2A gateway
+(`/a2a/<route key>`), both behind `Bearer <AGENT_SECRET>` (`backend/app/routers/agent_registry.py`). There is no
+LiteLLM and no LLM proxy: agents call their provider directly (`llm.md`). Each platform `make up` or `make restart`
+empties the registry (`clear-agent-registry`). `admin-db` holds users and signing keys; `redis` (container
+`agent-valkey`) holds the state. All join `prometheus_platform_agent-network`, and so does your agent after
+`make up`. Inside it, use service names (`http://backend:8000`, `redis://redis:6379`). `make up` waits until
+every container is healthy (`/healthz`), then `make check` waits until every agent is registered.
 
 ## One chat turn
 
@@ -25,7 +28,7 @@ users and signing keys; `redis` (container `agent-valkey`) holds the state. All 
 2. The backend sends A2A `SendStreamingMessage` to the client-agent: `contextId` is the conversation id, and
    `metadata.userToken` is an RS256 token made per turn (`backend/app/a2a_client.py:118-146`).
 3. The orchestrator LLM sees the conversation, the artifact catalog, and each skill and workflow as a tool. It
-   calls one, reads the result, and picks the next. It calls `POST http://litellm:4000/a2a/<route key>`.
+   calls one, reads the result, and picks the next. It calls `POST http://backend:8000/a2a/<route key>`.
 4. `_execute` runs. Status lines reach the UI only with `capabilities.streaming: true`. Outputs go into the
    artifact catalog; the backend adds a `render_hint`, and the UI picks a viewer.
 
@@ -56,9 +59,9 @@ The status history is the Valkey key `agent:status_history:<conversation id>`, k
 In the Prometheus chat: `/help`, `/agents` (your agent must be here), `/workflows`, `/artifacts`, `/tasks [id]`.
 Each workflow is also a slash command (`orchestrator/debug_commands.py:16-24`).
 
-Always on: `client-agent`, `form-filler-agent`, `osti-research-agent`, `synthesis-agent` (the best small LLM
-example). `make DEBUG_AGENTS=true up` in the platform adds `agents/debug-agents/` (it empties the registry:
+Always on: `client-agent`, `form-filler-agent`, `synthesis-agent` (the best small LLM example);
+`osti-research-agent` with `OPTIONAL_AGENTS=true`. `make DEBUG_AGENTS=true up` in the platform adds `agents/debug-agents/` (it empties the registry:
 `make down` your agent first): `artifact-debug-agent` (a PNG through DeepLynx, JSON, a workflow: "Make an image
-with the word Success"), `corrosion-agent` (input-required, context state, approval: "Corrosion analysis of
+with the word Success"), `corrosion-agent` (input-required, answers merged into `params`, approval: "Corrosion analysis of
 SS316"), `material-data-agent` (many skills), `thermal-agent` (a custom `json_type` viewer), and
 `thread-pattern-agent` (`PrometheusWorker`, `declare_long_running`: "Run a background task").

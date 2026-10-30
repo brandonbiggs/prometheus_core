@@ -265,10 +265,10 @@ A rebase rewrites your commits, so the push must be forced. `--force-with-lease`
 :::
 
 ::: card
-#### Rebasing an open PR
+#### Once review has started
 
 {.small}
-Any new push clears existing approvals. Rebase **before** asking for review; during review, push new commits instead.
+Don't rebase any more: **merge** the integration branch in (`git merge upstream/main`) and push new commits, so reviewers see only the delta. Any new push clears approvals.
 :::
 ::::
 
@@ -311,18 +311,17 @@ changes
 
 ::: cols 1.2fr 1fr gap=28px
 ```markdown {.sm}
-JIRA: PPLT-123            # project convention
+refs PPLT-123             # project convention
 
-## What
-Plot skill asks for columns when none are given.
-
-## Why
+## Reason
 "plot this" on a CSV used to fail.
 
-## How it was tested
-- uv run pytest, uv run ruff check .
-- Chat: uploaded the CSV, said "plot this",
-  picked columns in the form, plot rendered.
+## Design
+Plot skill asks for columns when none are given.
+
+## Impact
+No API change. Tested: uv run pytest, ruff;
+chat upload → "plot this" → form → plot rendered.
 ```
 
 |||
@@ -330,7 +329,7 @@ Plot skill asks for columns when none are given.
 {.sm}
 - **Title** like a commit subject.
 - **Small and focused**: one topic per PR.
-- Say **how you tested** it.
+- The sections of prometheus_core's PR template: **Reason, Design, Impact**. Say how you tested it.
 - In project work, reference the **JIRA task** (`PPLT-…`).
 - Still in progress? `gh pr create --draft`.
 :::
@@ -751,7 +750,7 @@ Agent `pyproject.toml` files must **not** list `prometheus_api`, a2a-sdk, starle
 #### Not git submodules
 
 {.small}
-The platform's `.gitmodules` is empty. External agents are separate repos that **register at runtime** with the platform's LiteLLM registry.
+The platform's `.gitmodules` is empty. External agents are separate repos that **register at runtime** with the platform backend's agent registry.
 :::
 
 ::: card
@@ -777,14 +776,12 @@ Change something in `sdk/`? The next `make up` in `platform/` rebuilds `promethe
 
 ::: grid 3 gap=18px
 ```text {.xs}
-platform/  (prometheus_core, dev)
+platform/  (prometheus_core, devel)
 ├── Makefile             # up, restart, logs…
 ├── docker-compose.yml   # core services
 ├── .env.example
-├── litellm_config.yaml  # LLM aliases
-├── certs/INL.pem        # frontend build
 ├── frontend/            # React + Vite
-├── backend/             # FastAPI
+├── backend/             # FastAPI + registry
 ├── agents/
 │   ├── client-agent/    # orchestrator
 │   ├── form-filler-agent/
@@ -815,7 +812,7 @@ sdk/  (formerly prometheus_api)
 ├── examples/
 ├── Dockerfile · Makefile
 ├── llm_config.example.yaml
-└── (CI: .github/workflows/sdk-tests.yml)
+└── (certs: ../common/certs/)
 ```
 
 |||
@@ -949,8 +946,10 @@ git switch -c feature/mesh-qa-agent upstream/devel
 git add -p
 git commit -m "Add mesh quality report skill"
 
-# stay current: replay your commits on top
+# before review: replay your commits on top
 git pull --rebase upstream devel
+# after review comments: merge instead
+#   git merge upstream/devel
 
 # run the local checks (next slides), then publish
 git push -u origin HEAD                # first push
@@ -972,7 +971,7 @@ gh pr create --repo idaholab/prometheus_core \
 #### Why rebase, not merge?
 
 {.small}
-Your branch stays a straight line of *your* commits on top of the current `devel`. Reviewers see only your change, the history has no "Merge branch 'devel' into …" noise, and conflicts are resolved once, commit by commit.
+**Before review**, your branch stays a straight line of *your* commits on top of the current `devel`. **Once reviewers have commented**, `DEVELOPMENT.md` asks you to merge `devel` in instead: a rebase rewrites the commits they already read.
 :::
 
 ::: card
@@ -1001,7 +1000,7 @@ The repos use **rulesets** that interact with force-pushes:
 - **All review threads resolved** before merge.
 
 ::: callout good
-**Recommended rhythm**<br>① Rebase onto `upstream/devel` and tidy *before* requesting review.<br>② During review, push **new commits** that address comments, so reviewers see the delta.<br>③ Rebase once more only if `devel` moved and there are conflicts, then ask for a final approval.
+**The rhythm in `DEVELOPMENT.md`**<br>① Rebase onto `upstream/devel` freely and tidy *before* review starts.<br>② Once reviewers have commented, push **new commits**, and **merge** `devel` in rather than force-pushing a rebase.<br>③ Must force-push anyway? `--force-with-lease`, and say so in the PR.
 :::
 
 |||
@@ -1011,11 +1010,11 @@ The repos use **rulesets** that interact with force-pushes:
 {.sm}
 | Repo | Allowed merge methods |
 |---|---|
-| prometheus_core | merge commit, squash, rebase |
+| prometheus_core | **merge commit** (every branch commit lands in `devel`) |
 | your team repo | your choice; merge commits keep the history |
 
 {.small}
-In practice most PRs land as **merge commits** ("Merge pull request #N from …"). A rebased feature branch makes that merge commit clean: the history shows your commits intact, followed by one merge.
+So squash "fix typo" and "address review" commits into the commit they fix **before approval**: the history that lands on `devel` should read cleanly.
 ::::
 
 ---
@@ -1059,12 +1058,13 @@ Avoid: `wip`, `fix`, `changes`, `address comments` as the only description of a 
 {.sm widths="280px|520px|"}
 | Repo / area | Commands | Notes |
 |---|---|---|
-| **Your generated agent** | `uv run pytest && uv run ruff check .` | The template ships 2 tests with mocked `RequestContext` and `EventQueue`. {.hl} |
-| **`platform/`** infra | `make test-static` | No Docker needed. `make test-integration` and `make test-system` need the stack running. |
+| **Your generated agent** | `uv run pytest && uv run ruff check .` | The template's tests use mocked `RequestContext` and `EventQueue`, and check that your card loads. {.hl} |
+| **`platform/`** infra | `make test-static` and `make check-markings` | No Docker needed. `make test-integration` and `make test-system` need the stack running. |
 | `platform/frontend/` | `cd frontend && make install && make check` | eslint + tsc |
 | `platform/agents/<name>` | `cd agents/<name> && uv run pytest` | client-agent: <code class="wrap">PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run python -m pytest -p pytest_asyncio.plugin tests</code> |
 | **`sdk/`** | `make check && make test`<br>`make hooks` (once) | `check` = ruff lint + ruff format --check + mypy. The hooks run ruff on commit and mypy + unit tests on push. |
 | `agent-template/` | `make check && make test` | Tests `setup_agent.py` itself. |
+| **Any `pyproject.toml` change** | `uv lock`, commit `uv.lock` | CI runs `uv lock --check`; agent builds fail on a missing or stale lockfile. New `.py`/`.ts` files: `python3 platform/scripts/add_markings.py`. |
 
 ::: callout warn
 Your team repo has **no CI**: these local checks are all there is. prometheus_core runs them in CI as well.
@@ -1078,13 +1078,14 @@ Your team repo has **no CI**: these local checks are all there is. prometheus_co
 #### prometheus_core · `.github/workflows/` {.acc}
 
 {.small}
-On GitHub-hosted runners, for PRs to `devel` and `main`:
+On GitHub-hosted runners, for PRs to `devel` and `main` and the merge queue:
 
 {.sm}
 | Workflow | Does |
 |---|---|
-| `test.yml` | gitleaks (no secrets in the new commits), ruff, SDK pytest on Python 3.12–3.14, SDK and platform Docker builds, backend and frontend checks |
-| `docs.yml` | builds the docs site |
+| `test.yml` | gitleaks, ruff, copyright markings, `uv lock --check`, image pins, hadolint + shellcheck, SDK/template/agent/backend/frontend tests, Docker builds, `compose config`, a full `make up`, slides up to date |
+| `lint-workflows.yml` | actionlint + zizmor on `.github/` changes |
+| codecov | **100% of changed lines covered**, project coverage may not drop |
 
 {.small}
 Run the local checks on the previous slide before you push; CI repeats them.
@@ -1103,7 +1104,7 @@ Run the local checks on the previous slide before you push; CI repeats them.
 :::
 ::::
 
-Note: test.yml is on the actions branch of prometheus_core and lands on devel with the CI change.
+Note: The merge_group trigger exists in test.yml; whether the merge queue is switched on is a branch setting. Uncovered changed lines are annotated inline in the PR diff.
 
 ---
 
@@ -1111,7 +1112,7 @@ Note: test.yml is on the actions branch of prometheus_core and lands on devel wi
 
 | Branch | Who merges | How you contribute |
 |---|---|---|
-| **prometheus_core `devel`** | the maintainers, after review | fork, then a PR to `idaholab:devel` {.hl} |
+| **prometheus_core `devel`** | maintainers, once CI passes and a **code owner** approves | fork, then a PR to `idaholab:devel` {.hl} |
 | prometheus_core `main` | maintainers, for releases | — |
 | **your team repo `main`** | the repo owner, after reviewing the PR | teammates fork it and open PRs {.hl} |
 
@@ -1131,14 +1132,14 @@ You cannot approve your own PR. In a team repo the owner reviews everyone's PRs,
 :::
 
 ::: card
-#### No PR templates
+#### Reviewers and template
 
 {.small}
-There is no template, so use the structure on the next slide.
+prometheus_core requests reviewers from `CODEOWNERS` and pre-fills a PR template (next slide). Your team repo has neither.
 :::
 ::::
 
-Note: Branch protection on prometheus_core devel is not configured yet; describe it as the working agreement.
+Note: CONTRIBUTING.md: "Reviewers are requested automatically from CODEOWNERS ... merged once CI passes and a code owner approves it." /hackathon/ and /agent-template/ are owned by dschwen and maxnezdyur.
 
 ---
 
@@ -1146,31 +1147,32 @@ Note: Branch protection on prometheus_core devel is not configured yet; describe
 
 ::: cols 1.3fr 1fr
 ```markdown {.sm}
-JIRA: PPLT-123
+refs PPLT-123
 
-## What
-Add a `mesh_quality_report` skill that reads an
-Exodus artifact and reports scaled Jacobian and
-aspect-ratio histograms.
-
-## Why
+## Reason
 Meshes from `geometry_meshing` go to MOOSE
 unchecked; bad elements fail late.
 
-## How it was tested
-- `uv run pytest` (6 passed), `uv run ruff check .`
-- Local platform: "check the mesh I just made"
-  routes to the skill; report artifact renders.
+## Design
+A `mesh_quality_report` skill reads an Exodus
+artifact and reports scaled Jacobian and
+aspect-ratio histograms.
 
-## Config / environment changes
+## Impact
 - New env var `MESHQA_MAX_ELEMENTS` (default 2e6)
-- Needs a rebuild of prometheus_api:local (SDK change)
+- Tested: `uv run pytest` (6 passed), ruff; chat
+  "check the mesh I just made" → report renders.
+
+## Checklist / AI assistance
+- [x] targets devel, one logical change …
+- [x] AI tools were used: Claude Code, tests
 ```
 
 |||
 
 - **Title**: an imperative sentence, like the commit subject ("Add…", "Fix…", "Stop…").
-- **Reference the JIRA task** (`PPLT-…`) at the top of the description.
+- **Reference the issue or JIRA task** (`refs #123`, `closes #123`, `PPLT-…`).
+- `.github/PULL_REQUEST_TEMPLATE.md` pre-fills **Reason / Design / Impact**, a checklist, and an **AI assistance** box: you remain responsible for every line.
 - **Small and focused.** One topic. Split refactors from behavior changes.
 :::
 
@@ -1207,7 +1209,8 @@ gh pr ready               # draft → ready
 - Reply to **every** thread. "Fixed in 8e46a68: …" with the commit SHA and a sentence of explanation.
 - Disagree with reasons. Maintainers push back too, sometimes with a table of cases.
 - Resolve threads only when the reviewer is satisfied, or after replying.
-- Accepted a GitHub suggestion in the web UI? `git pull --rebase` before your next push.
+- Accepted a GitHub suggestion in the web UI? `git pull` before your next push.
+- `devel` moved during review? Merge it in; don't force-push a rebase.
 :::
 
 ::: card

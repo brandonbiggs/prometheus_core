@@ -89,6 +89,9 @@ python3 setup_agent.py "Neutron Table Plot" \
 #  name: " Agent" is appended
 #  skill id:  neutron_extract_table
 #  copy secrets from ../platform/.env? yes
+cd ../../neutron-agent
+uv add pandas matplotlib          # writes uv.lock
+git add pyproject.toml uv.lock    # commit both
 ```
 
 ::: callout bad
@@ -101,7 +104,7 @@ Prefix the **card name and every skill ID** with your team name. All teams build
 |---|---|
 | `agent.py` | implement the skills {.hl} |
 | `agent_card.json` | describe the skills to the orchestrator {.hl} |
-| `pyproject.toml` | add *your* imports (pandas, matplotlib) |
+| `pyproject.toml` + `uv.lock` | `uv add` *your* imports; commit both |
 | `Dockerfile` | add a `COPY` line per extra module |
 | `tests/` | test with a mocked context |
 | `.env` | nothing. Never commit it. |
@@ -278,11 +281,10 @@ Status lines appear live only with `"capabilities": {"streaming": true}` in the 
 ```python {.sm}
 from prometheus_api.agent import MissingInput
 
-ctx = str(context.context_id)
-answers = self.get_provided_inputs(context)
-x = params.get("x_column") or answers.get("x_column")
+# on the resumed call the answer is in params,
+# next to all the original arguments
+x = params.get("x_column")
 if not x:
-    self.save_context_state(ctx, {"table": table_id})
     await self.send_input_required(
         context, event_queue,
         missing_inputs=[MissingInput(
@@ -299,7 +301,7 @@ if not x:
 {.sm}
 1. Your task pauses; the chat shows a form with a **dropdown** of the real column names.
 2. The user picks; the platform calls you **again** with the answers.
-3. Read them with `get_provided_inputs(context)`. Python variables don't survive, so save what you need with `save_context_state`.
+3. The answers arrive **merged into `params`**, together with the original arguments. `self.get_input_sources(context)` tells you who supplied each value (`model`, `user`, `context`).
 
 {.small}
 Need a yes/no before something costly? Put `"requires_approval": true` on the skill: the user approves before you are called.
@@ -333,16 +335,14 @@ One client in the base image. You pick a flavor in code; your `.env` picks the p
 
 :::: cols 1.35fr 1fr gap=28px
 ```python {.sm}
-import os
-from prometheus_api.llm_client import LLMConfig
+from prometheus_api.llm_client import LLMProviderError
 
-cfg = LLMConfig.from_env()   # profile from .env
-if cfg.proxy_url:            # only the platform proxy
-    cfg = cfg.with_api_key(os.getenv("LITELLM_MASTER_KEY"))
-
-async with self.llm_client(context, config=cfg) as llm:
-    r = await llm.small(
-        f"Which caption matches '{desc}'? {captions}")
+try:
+    async with self.llm_client(context) as llm:
+        r = await llm.small(
+            f"Which caption matches '{desc}'? {captions}")
+except LLMProviderError as e:   # one readable line
+    return {"status": "error", "error": str(e)}
 answer = r.text
 ```
 
@@ -358,10 +358,10 @@ answer = r.text
 | `embedding` | similarity search |
 
 ::: callout
-Which provider answers is set by `LLM_CONFIG_PROFILE` in your agent's `.env`: `inl_litellm`, `amsc`, or `anl_asksage` (deck 03). The master key is attached only for the platform's own proxy; otherwise your profile's key is used.
+Which provider answers is set by `LLM_CONFIG_PROFILE` in your agent's `.env` (the platform's, copied by `setup_agent.py`; deck 03). Your agent calls the provider directly with `LLM_API_KEY`.
 :::
 
-Note: The template compose forwards LLM_API_KEY, which every profile reads. Assumes the template agent.py LLM example has the proxy_url/with_api_key pattern.
+Note: The template compose forwards LLM_API_KEY, which every profile reads, and requires LLM_CONFIG_PROFILE. self.llm_client(context) reads config from the environment only (no key in A2A messages since prometheus-api 0.14.0).
 ::::
 
 ---
@@ -412,7 +412,7 @@ Get your agent onto the platform, find out why it isn't called, and test it with
 ```bash {.sm}
 cd ~/prometheus/neutron-agent
 make up                  # build + join the platform network
-make logs                # "Registered 'neutron-table-plot-agent'"
+make logs                # "Registered 'neutron-table-plot-agent' …"
 
 # in the chat
 /agents                  # your agent is listed
@@ -427,7 +427,7 @@ docker restart neutron-table-plot-agent
 |||
 
 {.sm}
-- At startup the agent **registers itself** with the platform's registry. Nothing to configure beyond the `.env`.
+- At startup the agent **registers itself** with the platform **backend** (`REGISTRY_URL=http://backend:8000`). Nothing to configure beyond the `.env`.
 - The orchestrator notices new or changed agents within about a minute.
 - Every platform `make up`/`make restart` empties the registry: restart your agent afterwards.
 
@@ -443,13 +443,15 @@ Start a **fresh conversation** for each test. Old uploads and results stay visib
 {widths="420px|"}
 | Symptom | Look at / fix |
 |---|---|
+| Container exits at startup | `make logs`: DeepLynx settings (`DEEPLYNX_*`) missing or wrong, or `LLM_CONFIG_PROFILE` not set |
+| Build fails: `uv.lock not found` / out of date | `uv sync` (or `uv add …`), commit `uv.lock` |
 | Not in `/agents` | `make logs` in your agent dir; restart it if the platform restarted |
 | Listed, but never called | the skill `description` and `usage_notes`; try other phrasings |
 | Called with the wrong arguments | parameter descriptions; what your previous result returned |
 | Crashes on the file | `make logs`: your traceback is there |
 | The plot doesn't render | `mime_type="image/png"`, DeepLynx configured |
-| LLM call fails with 401 | the key for your `LLM_CONFIG_PROFILE` in `.env` |
-| `ModuleNotFoundError` in the container | add it to `pyproject.toml`, and a `COPY` line for your own modules |
+| `LLMProviderError` (401, 404…) | `LLM_API_KEY` and `LLM_CONFIG_PROFILE` in `.env` |
+| `ModuleNotFoundError` in the container | `uv add` the package; a `COPY` line for your own modules |
 
 {.small}
 What the orchestrator decided, and why: `docker logs -f client-agent` in the platform.
@@ -484,12 +486,12 @@ async def test_finds_census(context, event_queue, monkeypatch):
 ```bash {.sm}
 uv sync
 uv pip install -e ~/prometheus/prometheus_core/sdk
-uv run pytest
+uv run pytest      # incl. test_build_app_loads_agent_card
 uv run ruff check .
 ```
 
 {.small}
-Both must pass for the gate. `fake_path` is your own small helper.
+Both must pass for the gate. A broken `agent_card.json` or `workflows/` file fails `pytest` too. `fake_path` is your own small helper.
 :::
 
 ---
@@ -549,7 +551,7 @@ if __name__ == "__main__":
 {.sm}
 - An A2A v1 JSON-RPC server (a2a-sdk + Starlette + uvicorn) on `AGENT_PORT`
 - `agent_card.json` loading, normalization, and serving
-- **Registration** with the LiteLLM registry at startup, with retries
+- **Registration** with the platform backend at startup, with retries
 - Bearer auth (`AGENT_SECRET`) and user identity (RS256 JWT)
 - Task lifecycle: initial Task → WORKING → your result → COMPLETED/FAILED
 - Heartbeats every 15 s while you work
@@ -570,7 +572,7 @@ if __name__ == "__main__":
 | `TUTORIAL.md` | A 1,247-line walkthrough: card, code, Docker, deploy, and every advanced pattern |
 | `README.md` | Quick start, run modes, further reading |
 | `success_message.txt` | The next-steps text printed after scaffolding |
-| `tests/test_setup_agent.py` | Tests for the scaffolder itself |
+| `tests/test_setup_agent.py` | Tests for the scaffolder itself (CI also scaffolds an agent and runs its tests) |
 | `Makefile` | `check`, `fix`, `test` for this repo |
 
 |||
@@ -583,12 +585,12 @@ if __name__ == "__main__":
 <li>older copies install <code>prometheus_api</code> from the old repo; install from <code>sdk/</code> in the monorepo instead</li>
 <li>local testing also needs <code>USER_IDENTITY_REQUIRED=false</code></li>
 <li>the tutorial's minimal workflow YAML is missing the required <code>description</code></li>
-<li>verifying <code>/v1/agents</code> needs the master-key header</li>
+<li>verifying <code>/v1/agents</code> needs <code>Authorization: Bearer $AGENT_SECRET</code></li>
 </ul>
 :::
 
 {.small}
-No CI for `agent-template/`. Generated agents get tests and ruff config, but no workflow files.
+CI runs the template's tests and a scaffold smoke test (`setup_agent.py --yes`). Generated agents get tests and ruff config, but no workflow files.
 ::::
 
 ---
@@ -616,7 +618,7 @@ No CI for `agent-template/`. Generated agents get tests and ruff config, but no 
 #### It copies the platform secrets for you
 
 {.small}
-If `../platform/.env` exists (the platform in the same clone), it offers to write the agent's `.env` with `AGENT_SECRET`, `REDIS_PASSWORD`, `LITELLM_MASTER_KEY`, `USER_IDENTITY_PUBLIC_KEY/ISS/AUD`, `LLM_CONFIG_PROFILE`, and every `DEEPLYNX_*`. With `LOCAL_SDK=true` in the platform it also points your agent at `prometheus_api:local`, the base image the platform built. It never copies the private key.
+If `../platform/.env` exists (the platform in the same clone), it offers to write the agent's `.env` with `AGENT_SECRET`, `REDIS_PASSWORD`, `USER_IDENTITY_PUBLIC_KEY/ISS/AUD`, `LLM_CONFIG_PROFILE`, `LLM_API_KEY`, `EMBEDDING_API_KEY`, and every `DEEPLYNX_*`. With `LOCAL_SDK=true` in the platform it also points your agent at `prometheus_api:local`, the base image the platform built. It never copies the private key.
 :::
 
 ::: callout bad
@@ -624,10 +626,9 @@ If `../platform/.env` exists (the platform in the same clone), it offers to writ
 :::
 
 ```text {.xs}
-# non-interactive (accept defaults, answer the rest)
-printf '\n\n\n\n\n\nno\nyes\nyes\n' \
-  | python3 setup_agent.py "Hello World" ../hello-world
-# last "yes" = copy ../platform/.env
+# non-interactive: every default, incl. copying
+# ../platform/.env; fails if the folder exists
+python3 setup_agent.py --yes "Hello World" ../hello-world
 ```
 ::::
 
@@ -648,8 +649,9 @@ hello-world/
 │   └── README.md
 ├── tests/
 │   ├── conftest.py           # mocked context + event_queue
-│   └── test_agent.py         # 2 tests
+│   └── test_agent.py         # 3 tests, incl. the card loads
 ├── pyproject.toml            # YOUR deps only
+├── uv.lock                   # created by uv sync; commit it
 ├── Dockerfile                # FROM prometheus_api base image
 ├── docker-compose.yml        # service + env
 ├── docker-compose.net_internal.yml   # join platform network
@@ -665,7 +667,7 @@ hello-world/
 #### `pyproject.toml`
 
 {.small}
-`dependencies = []`. Add only what *your* code imports (numpy, httpx, meshio…). Never add prometheus_api, a2a-sdk, starlette, or uvicorn: the base image provides them.
+`dependencies = []`. `uv add` only what *your* code imports (numpy, httpx, meshio…) and commit `uv.lock`: the image build runs `uv sync --locked` and fails without it. Never add prometheus_api, a2a-sdk, starlette, or uvicorn: the base image provides them.
 :::
 
 ::: card
@@ -746,7 +748,7 @@ if __name__ == "__main__":
 2. Set the card URL = `EXTERNAL_AGENT_URL` or `http://<hostname>:<AGENT_PORT>` (never put `url` in the file)
 3. Build routes: JSON-RPC `/`, card, health, jwks, debug
 4. Install bearer auth. Missing `AGENT_SECRET` → `RuntimeError`, unless `AGENT_SECRET_REQUIRED=false`.
-5. Lifespan: **register with LiteLLM** in the background
+5. Lifespan: **register with the backend** in the background
 6. uvicorn on `0.0.0.0:$AGENT_PORT` (8000)
 
 |||
@@ -821,7 +823,7 @@ How the orchestrator LLM decides whether and how to call you (and your result JS
 {widths="290px|130px|"}
 | Field | Required? | Meaning / consumer |
 |---|---|---|
-| `name` | yes | Display name **and** LiteLLM route key: lowercased, spaces → hyphens (`/a2a/hello-world-agent`). Must be unique. |
+| `name` | yes | Display name **and** registry route key: lowercased, spaces → hyphens (`/a2a/hello-world-agent`). Must be unique. |
 | `description` | yes | Agent-level summary. **Not shown** to the orchestrator LLM; it routes on the *skill* description. |
 | `version`, `defaultInputModes`, `defaultOutputModes` | defaulted | `1.0.0`, `["text"]` |
 | `capabilities.streaming` | no | `true` → the orchestrator uses `SendStreamingMessage` and you get live status |
@@ -886,7 +888,7 @@ How your agent announces itself, how the client-agent finds it, and the exact pa
 
 ---
 
-## One POST to LiteLLM at startup {eyebrow="Registering with the Agent Registry"}
+## One POST to the backend at startup {eyebrow="Registering with the Agent Registry"}
 
 ::: grid 2 gap=30px
 {.sm}
@@ -901,7 +903,7 @@ How your agent announces itself, how the client-agent finds it, and the exact pa
       "protocolVersion": "1.0" },
   "static_headers": {
       "Authorization": "Bearer <AGENT_SECRET>" } }
-# request header: Authorization: Bearer $LITELLM_MASTER_KEY
+# request header: Authorization: Bearer $AGENT_SECRET
 ```
 
 {.small}
@@ -912,17 +914,18 @@ Retries: `REGISTRY_MAX_RETRIES` (default 10), backoff 2 s → ×2 → capped at 
 {.sm}
 | Variable | Value |
 |---|---|
-| `REGISTRY_URL` | in Docker: `http://litellm:4000` or `http://litellm-proxy:4000` (template default); on the host: `http://localhost:9977` |
-| `LITELLM_MASTER_KEY` | the platform's value |
-| `AGENT_SECRET` | the platform's value; LiteLLM sends it to you |
-| `EXTERNAL_AGENT_URL` | overrides the registered URL. It must be reachable **from inside** the client-agent and LiteLLM containers. |
+| `REGISTRY_URL` | in Docker: `http://backend:8000` (template default); on the host: `http://localhost:8600` |
+| `AGENT_SECRET` | the platform's value: the registry token, and what the backend sends to you |
+| `LITELLM_MASTER_KEY` | legacy SDK name for the registry token; compose sets it to `${AGENT_SECRET}` |
+| `EXTERNAL_AGENT_URL` | overrides the registered URL. It must be reachable **from inside** the backend and client-agent containers. |
 
 ```bash {.xs}
 # verify
-curl -s -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-  http://localhost:9977/v1/agents | python3 -m json.tool
+curl -s -H "Authorization: Bearer $AGENT_SECRET" \
+  http://localhost:8600/v1/agents | python3 -m json.tool
 docker logs hello-world-agent 2>&1 | grep "Registered '"
-# → Registered 'hello-world-agent' with LiteLLM at http://…
+# → Registered 'hello-world-agent' with LiteLLM at
+#   http://backend:8000   (old log wording; it is the backend)
 ```
 :::
 
@@ -932,17 +935,17 @@ docker logs hello-world-agent 2>&1 | grep "Registered '"
 
 <div class="dg">
 <div class="row" style="gap:0; align-items:stretch">
-<div class="box navy" style="flex:1"><b>① discover</b><span class="mono">GET litellm:4000/v1/agents</span><span class="small">at startup, when the 60 s capability cache expires, on a skill miss, <code>POST /discovery/refresh</code></span></div>
+<div class="box navy" style="flex:1"><b>① discover</b><span class="mono">GET backend:8000/v1/agents</span><span class="small">at startup, when the 60 s capability cache expires, on a skill miss, <code>POST /discovery/refresh</code></span></div>
 <div class="arrow-h" style="width:40px"></div>
-<div class="box navy" style="flex:1"><b>② fetch the full card</b><span class="mono">GET {your url}/api/agent-card</span><span class="small">LiteLLM drops <code>inputSchema</code>, so the <b>direct</b> URL matters</span></div>
+<div class="box navy" style="flex:1"><b>② fetch the full card</b><span class="mono">GET {your url}/api/agent-card</span><span class="small">tried first; falls back to the card stored in the backend registry</span></div>
 <div class="arrow-h" style="width:40px"></div>
 <div class="box navy" style="flex:1"><b>③ one tool per skill</b><span class="small">built by the orchestrator loop (<code>agent_loop.build_tool_catalog</code>): name = skill id, args = <code>inputSchema</code>. Cards cached 60 s in Valkey.</span></div>
 </div>
 <div class="arrow-v"><span>the orchestrator LLM calls your skill as a tool</span></div>
 <div class="row" style="gap:0; align-items:stretch">
-<div class="box orange" style="flex:1.2"><b>④ call via the gateway</b><span class="mono">POST litellm:4000/a2a/hello-world-agent</span><span class="small"><code>Authorization: Bearer $LITELLM_MASTER_KEY</code> · <code>A2A-Version: 1.0</code> · <code>SendMessage</code>, or <code>SendStreamingMessage</code> if streaming</span></div>
+<div class="box orange" style="flex:1.2"><b>④ call via the gateway</b><span class="mono">POST backend:8000/a2a/hello-world-agent</span><span class="small"><code>Authorization: Bearer $AGENT_SECRET</code> · <code>A2A-Version: 1.0</code> · <code>SendMessage</code>, or <code>SendStreamingMessage</code> if streaming</span></div>
 <div class="arrow-h" style="width:40px"></div>
-<div class="box violet" style="flex:1"><b>⑤ LiteLLM forwards</b><span class="small">to the registered <code>url</code>, adding <code>static_headers</code>: <code>Bearer $AGENT_SECRET</code></span></div>
+<div class="box violet" style="flex:1"><b>⑤ the backend forwards</b><span class="small">to the registered <code>url</code>, adding <code>static_headers</code>: <code>Bearer $AGENT_SECRET</code></span></div>
 <div class="arrow-h" style="width:40px"></div>
 <div class="box green" style="flex:0.8"><b>⑥ your agent</b><span class="small">timeout 900 s</span></div>
 </div>
@@ -979,8 +982,8 @@ Restart the agent (re-registers), then refresh discovery or restart the client-a
 | Mode | How | Registered URL / notes |
 |---|---|---|
 | **Docker, internal network**<br><span class="small">(recommended)</span> | `make up` in the agent dir. It joins `prometheus_platform_agent-network` via `docker-compose.net_internal.yml`. | `http://<service>:8000`. `REGISTRY_URL`, `REDIS_URL`, and `JWKS_URL` resolve by service name. Start the platform first. {.hl} |
-| **Docker, external port** | `EXTERNAL_AGENT_HOST=prometheus.host.internal EXTERNAL_AGENT_PORT=8042 make up` | `EXTERNAL_AGENT_URL=http://prometheus.host.internal:8042`. Point `REGISTRY_URL`/`REDIS_URL`/`JWKS_URL` at `prometheus.host.internal:9977/6379/8600`. |
-| **Host Python**<br><span class="small">(fastest edit loop)</span> | `python agent.py` in a venv with `prometheus_api` installed | Set `REGISTRY_URL=http://localhost:9977`, `REDIS_URL=redis://localhost:6379`, `JWKS_URL=http://localhost:8600/.well-known/jwks.json`, `EXTERNAL_AGENT_URL=http://prometheus.host.internal:8000` |
+| **Docker, external port** | `EXTERNAL_AGENT_HOST=prometheus.host.internal EXTERNAL_AGENT_PORT=8042 make up` | `EXTERNAL_AGENT_URL=http://prometheus.host.internal:8042`. Point `REGISTRY_URL`/`REDIS_URL`/`JWKS_URL` at `prometheus.host.internal:8600/6379/8600`. |
+| **Host Python**<br><span class="small">(fastest edit loop)</span> | `python agent.py` in a venv with `prometheus_api` installed | Set `REGISTRY_URL=http://localhost:8600`, `REDIS_URL=redis://localhost:6379`, `JWKS_URL=http://localhost:8600/.well-known/jwks.json`, `EXTERNAL_AGENT_URL=http://prometheus.host.internal:8000` |
 | **In-tree** | Copy into `prometheus_core/platform/agents/<name>/`, then `make generate && make up` in `platform/` | Auto-included (one directory level). Uses the platform's `prometheus_api:local`. Copy `agents/synthesis-agent/docker-compose.yml` as the model. |
 
 :::: grid 2
@@ -1006,7 +1009,7 @@ uv pip install -e \
 
 AGENT_SECRET=dev AGENT_SECRET_REQUIRED=false \
 USER_IDENTITY_REQUIRED=false PROMETHEUS_TASK_STORE=memory \
-AGENT_PORT=8000 python agent.py
+AGENT_PORT=8000 python agent.py    # DEEPLYNX_* from .env
 # "Loaded agent card…"  "Starting HTTP server on 0.0.0.0:8000"
 # registration retries, then "Continuing without registration"
 ```
@@ -1021,7 +1024,7 @@ curl -s -X POST localhost:8000/api/chat \
 ```
 
 {.tiny}
-With `AGENT_SECRET_REQUIRED=true`, add `-H "Authorization: Bearer $AGENT_SECRET"` to every call except `/healthz` and the card routes.
+The agent refuses to start without DeepLynx (`DEEPLYNX_ORG_ID`, `DEEPLYNX_PROJECT_ID`, and key + secret or `DEEPLYNX_JWT_TOKEN`); a `.env` in the folder is read. With `AGENT_SECRET_REQUIRED=true`, add `-H "Authorization: Bearer $AGENT_SECRET"` to every call except `/healthz` and the card routes.
 :::
 
 ---
@@ -1084,6 +1087,7 @@ curl -s -X POST http://localhost:8000/ \
 #   context:     MagicMock(spec=RequestContext)
 #                context_id="test-conversation"
 #   event_queue: AsyncMock(spec=EventQueue)
+# and sets AGENT_SECRET, PROMETHEUS_TASK_STORE=memory
 
 async def test_hello(context, event_queue):
     agent = HelloWorldAgent(agent_name="Hello World Agent")
@@ -1098,7 +1102,7 @@ uv run pytest && uv run ruff check .
 ```
 
 {.small}
-Mock `self.llm_client` in tests; never call a real LLM from the test suite.
+Mock `self.llm_client` in tests; never call a real LLM from the test suite. `test_build_app_loads_agent_card` builds the app without serving or registering, so a broken card fails here. PRs to `prometheus_core` also need 100% coverage of changed lines (codecov).
 :::
 
 ---
@@ -1130,7 +1134,8 @@ Status, artifacts, user input, state, long-running work, and DeepLynx.
 | Helper | What it does |
 |---|---|
 | `send_input_required(context, eq, missing_inputs=[MissingInput(…)], hint=)` | Pause and ask the user (INPUT_REQUIRED); `return {}` afterwards |
-| `get_provided_inputs(context)` | The user's answers on the resumed call |
+| `get_input_sources(context)` | Who supplied each param: `model`, `user` or `context` (the answers themselves are in `params`) |
+| `execution_record_id` | DeepLynx execution record of this call (inside `_execute`) |
 | `load_context_state(ctx_id)` / `save_context_state(ctx_id, state)` | Per-agent, per-conversation JSON state in Valkey (24 h TTL) |
 | `declare_long_running(context, eq, estimate_seconds=, message=)` | The orchestrator detaches the turn; the result is delivered later over SSE |
 | `await run_worker(PrometheusWorker(...), context, eq)` | Run blocking code on a thread and stream its progress |
@@ -1205,11 +1210,11 @@ Declarative, in the card (or in a workflow's `metadata`). The orchestrator retur
 #### While you run: `send_input_required`
 
 {.small}
-Your task ends in `TASK_STATE_INPUT_REQUIRED`. Inputs with `resolvable_from_context=True` are filled from the call's arguments or earlier answers; otherwise the user gets a form (`options` → dropdown, your `hint` as the message), and you are **resumed** with the same `contextId`/`taskId` and `provided_inputs`. A typed reply instead of the form abandons the task; the model may call you again.
+Your task ends in `TASK_STATE_INPUT_REQUIRED`. Inputs with `resolvable_from_context=True` are filled from the call's arguments or earlier answers; otherwise the user gets a form (`options` → dropdown, your `hint` as the message), and you are **resumed** with the same `contextId`/`taskId`, the answers merged into `params` with the original arguments. A typed reply instead of the form abandons the task; the model may call you again.
 :::
 
 ::: callout warn
-Your Python state does **not** survive between the two calls. Save it with `save_context_state` before asking. `request_user_approval(…)`, mentioned in some docs, does not exist.
+Your Python variables do **not** survive between the two calls, but your arguments do: they come back in `params`. Anything else (intermediate results) goes in `save_context_state`. Never ask for secrets this way. `request_user_approval(…)`, mentioned in some docs, does not exist.
 :::
 ::::
 
@@ -1221,13 +1226,8 @@ Your Python state does **not** survive between the two calls. Save it with `save
 from prometheus_api.agent import MissingInput
 
 async def _execute(self, params, context, event_queue):
-    ctx = str(context.context_id)
-    state = self.load_context_state(ctx)
-    answers = self.get_provided_inputs(context)
-
-    if "confirm" not in answers:
-        state["pending"] = params
-        self.save_context_state(ctx, state)
+    # resumed call: the original arguments + the answers
+    if "confirm" not in params:
         await self.send_input_required(
             context, event_queue,
             missing_inputs=[MissingInput(
@@ -1238,9 +1238,9 @@ async def _execute(self, params, context, event_queue):
             hint="Confirm before the expensive job.")
         return {}
 
-    params = state.pop("pending", params)
-    if not answers["confirm"]:
+    if not params["confirm"]:
         return {"status": "cancelled"}
+    who = self.get_input_sources(context)   # {"confirm": "user", …}
     …
 ```
 
@@ -1318,25 +1318,30 @@ The one LLM interface in the base image: flavors in code, profiles in deployment
 
 |||
 
-#### The platform-safe pattern {.acc}
+#### The pattern {.acc}
 
 ```python {.xs}
-import os
-from prometheus_api.llm_client import LLMConfig
+from prometheus_api.llm_client import LLMClientError
 
-cfg = LLMConfig.from_env()
-if cfg.proxy_url:     # registry profile → LiteLLM
-    cfg = cfg.with_api_key(os.getenv("LITELLM_MASTER_KEY"))
-
-async with self.llm_client(context, config=cfg) as llm:
-    r = await llm.medium(prompt, max_tokens=1800,
-                         temperature=0.2)
+try:
+    async with self.llm_client(context) as llm:
+        r = await llm.medium(prompt, max_tokens=1800,
+                             temperature=0.2)
+except LLMClientError as e:
+    return {"status": "error", "error": str(e)}
 return {"summary": r.text,
         "model": r.provider_model or r.model_alias}
 ```
 
-::: callout warn
-The LiteLLM proxy requires its master key, and `LLMConfig` does **not** attach it by itself, so a plain `self.llm_client(context)` gets **HTTP 401** on the platform. Every in-tree agent uses the pattern above; the template's commented example lacks it.
+{.xs}
+| Error (all `LLMClientError`) | Means |
+|---|---|
+| `LLMConfigError` | unknown `LLM_CONFIG_PROFILE`, bad YAML; lists the profiles |
+| `LLMEndpointUnavailableError` | endpoint unreachable; names URL, alias, profile |
+| `LLMProviderError` | HTTP ≥ 400 from the provider: `.status_code`, `.detail` |
+
+::: callout
+Credentials come only from the environment (`LLM_API_KEY`) or `config=`, never from the A2A message.
 :::
 ::::
 
@@ -1367,13 +1372,13 @@ Six flavors, a fixed contract. There is no "fast/smart" naming and no `MODEL_NAM
 <div class="arrow-v" style="height:28px"><span>else</span></div>
 <div class="box violet"><b><code>LLM_CONFIG_PROFILE</code></b> set?<span class="small">→ <code>sdk/prometheus_api/llm_configs/&lt;name&gt;.yaml</code></span></div>
 <div class="arrow-v" style="height:28px"><span>else</span></div>
-<div class="box violet"><b><code>registry</code></b><span class="small"><code>proxy_url: os.environ/REGISTRY_URL</code> → LiteLLM</span></div>
+<div class="box violet"><b><code>registry</code></b><span class="small">an LLM proxy at <code>REGISTRY_URL</code>: <b>not supported</b> on the platform (the backend is no LLM proxy). Always set a profile.</span></div>
 </div>
 
 {.xs}
-- With a `proxy_url`: `GET /v1/models` (alias must exist, else `LLMAliasError`), then `POST /v1/chat/completions`.
-- Falls back to the YAML `model_list` **only** on connection errors, never on 4xx/5xx.
-- A `.env` in the working directory **overrides** the process env for everything `LLMConfig` reads, including the `REGISTRY_URL` behind `proxy_url`. A copied `.env` with `litellm:4000` breaks host-mode LLM calls.
+- Profiles: `anthropic`, `openai`, `genesis`, `ollama`, `amsc`, `anl_asksage`, `inl_hpc`, `inl_litellm`; `list_llm_config_profiles()` lists them.
+- A flavor the profile doesn't define raises `LLMAliasError`.
+- A `.env` in the working directory **overrides** the process env for everything `LLMConfig` reads.
 :::
 
 ---
@@ -1402,26 +1407,23 @@ Start from `sdk/llm_config.example.yaml`. Mount it into the container and set `L
 
 ---
 
-## Options B and C: a new profile, or a proxy alias {eyebrow="Adding configurations"}
+## Option B: a new installed profile {eyebrow="Adding configurations"}
 
 :::: grid 2 gap=24px
 ::: card tag="B · new installed profile"
 {.sm}
 1. Add `sdk/prometheus_api/llm_configs/<name>.yaml` with **all six** flavors
-2. Add the name to `LLM_CONFIG_PROFILES` in `llm_configs/__init__.py`
+2. Nothing to register: every `*.yaml` there is a profile (`list_llm_config_profiles()`)
 3. Update `tests/test_llm_configs.py`, `specs/005`, README/ENV_SETUP
 4. Bump the version, and note it in `AGENT_MIGRATIONS.md`
 5. `make up` in `platform/` rebuilds `prometheus_api:local` with it
 6. Select it with `LLM_CONFIG_PROFILE=<name>`
 
 {.small}
-A PR to `prometheus_api` (base `main`).
+A PR to `prometheus_core` (`sdk/`, base `devel`).
 :::
 
-::: card tag="C · platform proxy alias"
-{.small}
-Add `small`/`large`/`vision`/`embedding`/`default` entries to `platform/litellm_config.yaml`, then `make restart`. Every agent on the `registry` profile gets them, with no agent change.
-
+::: card tag="Keys and model strings"
 {.small}
 The template compose forwards `LLM_API_KEY` (every profile's key) and `EMBEDDING_API_KEY` from your `.env`. A key of your own needs an `environment:` line.
 
@@ -1538,7 +1540,7 @@ Full schema: `platform/docs/docs/workflow-templates.md`. Examples: `platform/age
 
 <div class="dg">
 <div class="row" style="align-items:stretch; gap:0">
-<div class="box sky" style="flex:1"><b>① merge + validate inputs</b><span class="small"><code>get_provided_inputs()</code> + params; check <code>element_size</code></span></div>
+<div class="box sky" style="flex:1"><b>① merge + validate inputs</b><span class="small">late answers already in params; check <code>element_size</code></span></div>
 <div class="arrow-h" style="width:40px"></div>
 <div class="box sky" style="flex:1"><b>② resolve the STEP artifact</b><span class="small"><code>get_artifact_file_path()</code> → local <code>.step</code></span></div>
 <div class="arrow-h" style="width:40px"></div>
@@ -1682,11 +1684,11 @@ networks:
 - ☐ Every `inputSchema` property described; minimal `required`
 - ☐ File inputs use `x_artifact_ref`; chained values use `x_input_source: runtime`
 - ☐ `"streaming": true` if you send status updates
-- ☐ LLM through `self.llm_client` with the master key attached; the flavor that fits each call
+- ☐ LLM through `self.llm_client(context)`; the flavor that fits each call; `LLMClientError` handled
 - ☐ Nothing blocks the event loop
 - ☐ Outputs as artifacts with a correct `mime_type`; return `artifact_id`s
 - ☐ Errors: return an error dict for user problems; raise for infrastructure
-- ☐ `pyproject.toml` lists your deps only; `COPY` lines for new modules
+- ☐ `pyproject.toml` lists your deps only, `uv.lock` committed; `COPY` lines for new modules
 - ☐ `uv run pytest` + `uv run ruff check .` pass
 - ☐ Registered (`/v1/agents`), visible in `/agents`, routed from a natural-language request
 

@@ -1,21 +1,25 @@
 # Run and register your agent
 
-Facts as of `prometheus_api` 95c32b5 (v0.13.0) and `prometheus_platform` `dev` 22fed42, 2026-10-05. When the code disagrees with this file, the code is correct.
+Facts as of `prometheus_core` `devel` 2026-10-29 (`prometheus_api` 0.15, no LiteLLM). When the code disagrees with this file, the code is correct.
 
 ## Start it
 
 `make up` in the agent folder runs `docker compose up --build -d` and joins
 `prometheus_platform_agent-network` (`agent_template/Makefile:71-73`); without the network it
-stops with "The Prometheus Platform must be launched first…". The image holds the code and the
-card (`agent_template/Dockerfile:34-37`), and Compose reads `environment:` only on create: after
-any change, run `make up`, not `docker restart`. `make logs` never ends; use `docker logs`.
+stops with "The Prometheus Platform must be launched first…". The build needs a committed `uv.lock`
+(`uv add <pkg>`, then commit it with `pyproject.toml`; `agent-lockfile`). The image holds the code and the
+card (`agent_template/Dockerfile:46-49`), and Compose reads `environment:` only on create: after
+any change, run `make up`, not `docker restart`. `make logs` never ends; use `docker logs`. The agent exits at
+startup with "Invalid required DeepLynx configuration: …" without the `DEEPLYNX_*` values (`deeplynx-env`).
 
 ## Registration and the route key
 
 At startup the agent deletes an entry with its `agent_name` from `{REGISTRY_URL}/v1/agents`, then
-registers its card, URL, and `static_headers` (`Bearer <AGENT_SECRET>`) with the master key
-(`prometheus_api/prometheus_api/agent/registry.py:78-165`; deck 04, A15). The log says
-`Registered '<route key>' with LiteLLM at http://litellm-proxy:4000`.
+registers its card, URL, and `static_headers` (`Bearer <AGENT_SECRET>`) with the backend, using
+`LITELLM_MASTER_KEY` as the token (the SDK's legacy name; compose sets it to `${AGENT_SECRET}`)
+(`sdk/prometheus_api/agent/registry.py`; deck 04, appendix). `REGISTRY_URL` is `http://backend:8000` in
+Docker, `http://prometheus.host.internal:8600` in external mode, `http://localhost:8600` on the host. The log
+says `Registered '<route key>' with LiteLLM at http://backend:8000` (old wording, same backend).
 
 - **The route key** is the card `name` in lowercase, spaces changed to hyphens
   (`registry.py:50-53`): "Hello Max Agent" → `hello-max-agent`. The same key deletes the other
@@ -25,9 +29,10 @@ registers its card, URL, and `static_headers` (`Bearer <AGENT_SECRET>`) with the
 
 ## Discovery: how the orchestrator finds you
 
-The `client-agent` reads `/v1/agents`, fetches your full card from your URL (the LiteLLM copy has
-no `inputSchema`, `client-agent/tool_discovery.py:118-143`), and makes one tool per skill. It calls
-`POST http://litellm:4000/a2a/<route key>` with `A2A-Version: 1.0`, for up to 900 s. The cards
+The `client-agent` reads `backend:8000/v1/agents`, fetches your full card from your URL first (then
+the registry copy, `client-agent/tool_discovery.py:133-145`), and makes one tool per skill. It calls
+`POST http://backend:8000/a2a/<route key>` with `A2A-Version: 1.0`; the backend forwards with your
+`static_headers`, for up to 900 s. The cards
 that the LLM sees refresh every 60 s (`capability_cache.py:96`); the dispatch tools every 300 s
 and once on an unknown skill (`orchestrator/runtime.py:209-217`). `discovery-refresh` renews both.
 
@@ -36,7 +41,7 @@ and once on an unknown skill (`orchestrator/runtime.py:209-217`). `discovery-ref
 | what changed | run |
 |---|---|
 | code, card, `pyproject.toml`, `Dockerfile`, compose, or the agent `.env` | `make up` in the agent folder, then `discovery-refresh` |
-| the platform restarted (it empties the registry, `Makefile:232-250`) | `docker restart <container>`, or `make up` after a `make down` |
+| the platform restarted (it empties the registry: `clear-agent-registry`) | `docker restart <container>`, or `make up` after a `make down` |
 | `docker restart` fails: "network … not found" | `make down`, then `make up` |
 | any of these, before a chat test | a fresh chat conversation (deck 04, slide 18) |
 

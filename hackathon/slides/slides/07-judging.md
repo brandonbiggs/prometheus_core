@@ -110,7 +110,7 @@ Note: Set the submission deadline, a place to collect submissions, and the platf
 3. Registers with the platform; listed under `/agents`
 4. Natural-language requests are **routed by the orchestrator**
 5. Extract emits a table artifact; plot emits an **image that renders**
-6. `uv run pytest` and `uv run ruff check .` pass
+6. `uv.lock` is committed and current; `uv run pytest` and `uv run ruff check .` pass
 7. Every merged PR **reviewed**: by the owner, or by a teammate for the owner's own
 
 |||

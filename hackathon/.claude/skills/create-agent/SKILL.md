@@ -1,6 +1,6 @@
 ---
 name: create-agent
-description: Builds the user's Prometheus agent (an A2A service that the Prometheus chat routes to, not a Claude Code subagent) and teaches each step. It works out what is needed - set up a new agent from prometheus_agent_template that runs and is registered, add one platform feature (read an upload, publish a JSON table or a PNG, status updates, ask the user, approval, call an LLM, a structured answer, long-running work, a second skill, a workflow), or improve the agent card so that the orchestrator picks the right skill. Use for "create an agent", "new agent", "Day 1 hello agent", "start our team agent", "add a feature", "read the upload", "publish a plot", "call an LLM from my agent", "add a second skill", "review my card", "improve my skill description", or "my agent is never called".
+description: Builds the user's Prometheus agent (an A2A service that the Prometheus chat routes to, not a Claude Code subagent) and teaches each step. It works out what is needed - set up a new agent from prometheus_core/agent-template that runs and is registered, add one platform feature (read an upload, publish a JSON table or a PNG, status updates, ask the user, approval, call an LLM, a structured answer, long-running work, a second skill, a workflow), or improve the agent card so that the orchestrator picks the right skill. Use for "create an agent", "new agent", "Day 1 hello agent", "start our team agent", "add a feature", "read the upload", "publish a plot", "call an LLM from my agent", "add a second skill", "review my card", "improve my skill description", or "my agent is never called".
 argument-hint: "[what you want, e.g. an agent name, add a file upload, improve my card]"
 allowed-tools:
   - Bash(docker restart client-agent)
@@ -15,12 +15,14 @@ Build the user's agent, and teach each step at the level of the slides. The requ
 
 1. `git rev-parse --show-toplevel` gives `<root>`. The KB is `<root>/.claude/skills/how/references/`
    (`<kb>`). Read `<kb>/conventions.md` and `<kb>/teaching.md`.
-2. `cd "<root>/.." && pwd` gives `<parent>`. `<platform>` is `<parent>/prometheus_platform`, and
-   `<template>` is `<parent>/prometheus_agent_template`. Check them:
+2. `cd "<root>/.." && pwd` gives `<parent>`. `<platform>` is `<parent>/prometheus_core/platform`, and
+   `<template>` is `<parent>/prometheus_core/agent-template`. Check them:
    `test -f <platform>/docker-compose.yml && echo platform-ok; test -f <template>/setup_agent.py && echo template-ok`.
-   When one is missing, list `ls -d ~/*/prometheus_*` and ask once (header `Platform`).
+   When one is missing, list `ls -d ~/*/prometheus_core` and ask once (header `Platform`).
 3. Read the ports, names only:
-   `grep -E '^(BACKEND_PORT|LITELLM_LOCAL_PORT|FRONTEND_DEV_PORT|FRONTEND_PROD_PORT)=' <platform>/.env`.
+   `grep -E '^(BACKEND_PORT|FRONTEND_DEV_PORT|FRONTEND_PROD_PORT)=' <platform>/.env`.
+   The backend (`BACKEND_PORT`, default 8600) is the agent registry: `/v1/agents` with
+   `Authorization: Bearer $AGENT_SECRET`.
    The task files show the default ports; use the values that you read.
 
 ## Rules
@@ -33,6 +35,9 @@ Build the user's agent, and teach each step at the level of the slides. The requ
   secrets.
 - Write the plumbing. Leave the domain logic as `# TODO:` hints, unless the user says yes.
 - Explain each change in one or two lines.
+- Add a dependency with `uv add <pkg>` in the agent folder and commit `uv.lock` with
+  `pyproject.toml`; the image build fails without a current `uv.lock`.
+- Late inputs arrive merged into `params`; there is no `get_provided_inputs`.
 - Never edit the platform or the template. Read files outside `<root>` with `sed -n`, `grep -n`,
   `ls`. The Read and Edit tools ask for permission in `<parent>/hello-*/`; tell the user to allow
   them.

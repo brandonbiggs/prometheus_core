@@ -13,8 +13,8 @@ The request: `$ARGUMENTS`
 1. Run `git rev-parse --show-toplevel` to get `<root>` (not `${CLAUDE_PROJECT_DIR}`). The KB is
    `<root>/.claude/skills/how/references/`; a KB file name below means a file there.
 2. Read `conventions.md` and `teaching.md` once per session, and obey them.
-3. `<platform>` is `<root>/../prometheus_platform`, `<template>` is
-   `<root>/../prometheus_agent_template`. Check each with `test -d <path> && echo ok`. When one is
+3. `<platform>` is `<root>/../prometheus_core/platform`, `<template>` is
+   `<root>/../prometheus_core/agent-template`. Check each with `test -d <path> && echo ok`. When one is
    missing and the request needs it, ask once for its path (header `Folder`).
 4. For a request about the user's own agent, find it by "Find your agent" in `conventions.md`,
    and read `<container>` with `grep -m1 'container_name:' <agent>/docker-compose.yml`. No agent

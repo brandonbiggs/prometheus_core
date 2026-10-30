@@ -25,8 +25,11 @@ services:
 
       AGENT_SECRET: ${AGENT_SECRET}
       AGENT_SECRET_REQUIRED: ${AGENT_SECRET_REQUIRED:-true}
-      REGISTRY_URL: ${REGISTRY_URL:-http://litellm-proxy:4000}
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      # The platform backend is the agent registry and A2A gateway. The SDK
+      # reads its registry token from LITELLM_MASTER_KEY (a legacy name); the
+      # backend accepts AGENT_SECRET.
+      REGISTRY_URL: ${REGISTRY_URL:-http://backend:8000}
+      LITELLM_MASTER_KEY: ${AGENT_SECRET}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
 
@@ -53,12 +56,12 @@ services:
       DEEPLYNX_DATA_SOURCE_ID: ${DEEPLYNX_DATA_SOURCE_ID:-}
 
       # LLM configuration. The profile maps the semantic flavors the agent asks
-      # for in code onto concrete provider models; `registry` (the default)
-      # routes inference through the platform's LiteLLM proxy. Every profile
-      # reads its provider key from LLM_API_KEY. There is deliberately no
+      # for in code onto concrete provider models. There is no default: use the
+      # platform's profile (setup_agent.py copies it). Every profile reads its
+      # provider key from LLM_API_KEY. There is deliberately no
       # MODEL_NAME here -- picking the model is the agent's job, not the
       # deployment's.
-      LLM_CONFIG_PROFILE: ${LLM_CONFIG_PROFILE:-registry}
+      LLM_CONFIG_PROFILE: ${LLM_CONFIG_PROFILE:?set LLM_CONFIG_PROFILE in .env}
       LLM_CONFIG_FILE: ${LLM_CONFIG_FILE:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
@@ -79,9 +82,7 @@ services:
       # Add your own agent-specific variables here (and in .env):
       PYTHONDONTWRITEBYTECODE: 1
     # /healthz is served by the PrometheusAgent base class once uvicorn is up.
-    # It is the deprecated alias of /healthz, used until the pinned base image
-    # includes /healthz.
-    # It does not cover LiteLLM registration, which retries in the background.
+    # It does not cover registration, which retries in the background.
     # The platform requires this on every agent in agents/*/docker-compose.yml.
     # Reads AGENT_PORT inside the container, so it follows an override.
     healthcheck:

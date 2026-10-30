@@ -9,7 +9,7 @@ Never repeat a value that looks like a key.
 ## 1. Set up
 
 Read `card.md` ("What the orchestrator sees"). No agent is fine. Run
-`docker ps --format '{{.Names}}' | grep -x -e agent-valkey -e client-agent -e litellm-proxy`;
+`docker ps --format '{{.Names}}' | grep -x -e agent-valkey -e client-agent -e backend`;
 without `agent-valkey` or `client-agent`, go on with `fix-problem.md`. Primer: the LLM sees the
 conversation, the artifact catalog, and each skill and workflow as a tool; it calls, reads, and
 decides again, for at most 12 steps; the turn ends in one status (deck 01, A9-A11).
@@ -94,7 +94,7 @@ entry holds `tool_inputs` and `tool_results` (`orchestrator/chat_flow.py:157-168
 
 ```sh
 docker logs --since <n>m client-agent 2>&1 | grep -E "Cached capability|Capability cache refreshed|Tool call .* failed|Request failed for conversation|Traceback|Error" | tail -40
-docker logs --since <n>m litellm-proxy 2>&1 | grep '/a2a/' | tail -20
+docker logs --since <n>m backend 2>&1 | grep -E "A2A proxy to|Registered agent|Removed agent registration" | tail -20
 docker logs --since <n>m <container> 2>&1 | grep -E "Starting .* execution|Extracted parameter keys|execution completed successfully|Error during execution|Identity verification failed" | tail -30
 ```
 

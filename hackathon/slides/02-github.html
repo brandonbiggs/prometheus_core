@@ -268,8 +268,8 @@ git rebase --abort  <span class="c"># start over</span></pre>
 </div>
 
 <div class="card">
-<h4>Rebasing an open PR</h4>
-<p class="small">Any new push clears existing approvals. Rebase <strong>before</strong> asking for review; during review, push new commits instead.</p>
+<h4>Once review has started</h4>
+<p class="small">Don't rebase any more: <strong>merge</strong> the integration branch in (<code>git merge upstream/main</code>) and push new commits, so reviewers see only the delta. Any new push clears approvals.</p>
 </div>
 
 </div>
@@ -311,23 +311,22 @@ changes</pre>
   <div class="head"><div class="eyebrow">Opening a PR</div><h2>A description reviewers can act on</h2></div>
   <div class="content">
 <div class="grid" style="grid-template-columns: 1.2fr 1fr; gap:28px;">
-<pre class="sm">JIRA: PPLT-123            # project convention
+<pre class="sm">refs PPLT-123             # project convention
 
-<span class="p">## What</span>
-Plot skill asks for columns when none are given.
-
-<span class="p">## Why</span>
+<span class="p">## Reason</span>
 &quot;plot this&quot; on a CSV used to fail.
 
-<span class="p">## How it was tested</span>
-<span class="k">-</span> uv run pytest, uv run ruff check .
-<span class="k">-</span> Chat: uploaded the CSV, said &quot;plot this&quot;,
-  picked columns in the form, plot rendered.</pre>
+<span class="p">## Design</span>
+Plot skill asks for columns when none are given.
+
+<span class="p">## Impact</span>
+No API change. Tested: uv run pytest, ruff;
+chat upload → &quot;plot this&quot; → form → plot rendered.</pre>
 <div class="col">
 <ul class="b sm">
 <li><strong>Title</strong> like a commit subject.</li>
 <li><strong>Small and focused</strong>: one topic per PR.</li>
-<li>Say <strong>how you tested</strong> it.</li>
+<li>The sections of prometheus_core's PR template: <strong>Reason, Design, Impact</strong>. Say how you tested it.</li>
 <li>In project work, reference the <strong>JIRA task</strong> (<code>PPLT-…</code>).</li>
 <li>Still in progress? <code>gh pr create --draft</code>.</li>
 </ul>
@@ -723,7 +722,7 @@ For the hackathon you need only <code>prometheus_core</code> and a github.com ac
 
 <div class="card">
 <h4>Not git submodules</h4>
-<p class="small">The platform's <code>.gitmodules</code> is empty. External agents are separate repos that <strong>register at runtime</strong> with the platform's LiteLLM registry.</p>
+<p class="small">The platform's <code>.gitmodules</code> is empty. External agents are separate repos that <strong>register at runtime</strong> with the platform backend's agent registry.</p>
 </div>
 
 <div class="card">
@@ -745,14 +744,12 @@ Change something in <code>sdk/</code>? The next <code>make up</code> in <code>pl
   <div class="head"><div class="eyebrow">Inside the monorepo</div><h2>Where things live</h2></div>
   <div class="content">
 <div class="grid g3" style="gap:18px;">
-<pre class="xs">platform/  (prometheus_core, dev)
+<pre class="xs">platform/  (prometheus_core, devel)
 ├── Makefile             # up, restart, logs…
 ├── docker-compose.yml   # core services
 ├── .env.example
-├── litellm_config.yaml  # LLM aliases
-├── certs/INL.pem        # frontend build
 ├── frontend/            # React + Vite
-├── backend/             # FastAPI
+├── backend/             # FastAPI + registry
 ├── agents/
 │   ├── client-agent/    # orchestrator
 │   ├── form-filler-agent/
@@ -778,7 +775,7 @@ Change something in <code>sdk/</code>? The next <code>make up</code> in <code>pl
 ├── examples/
 ├── Dockerfile · Makefile
 ├── llm_config.example.yaml
-└── (CI: .github/workflows/sdk-tests.yml)</pre>
+└── (certs: ../common/certs/)</pre>
 <pre class="xs">agent-template/
 ├── setup_agent.py     # scaffolder
 ├── TUTORIAL.md        # 1,200+ lines
@@ -948,8 +945,10 @@ git switch -c feature/mesh-qa-agent upstream/devel
 git add -p
 git commit -m <span class="s">&quot;Add mesh quality report skill&quot;</span>
 
-<span class="c"># stay current: replay your commits on top</span>
+<span class="c"># before review: replay your commits on top</span>
 <span class="h">git pull --rebase upstream devel</span>
+<span class="c"># after review comments: merge instead</span>
+<span class="c">#   git merge upstream/devel</span>
 
 <span class="c"># run the local checks (next slides), then publish</span>
 git push -u origin HEAD                <span class="c"># first push</span>
@@ -969,7 +968,7 @@ gh pr create --repo idaholab/prometheus_core <span class="s">\</span>
 <div class="grid g3" style="gap:22px;">
 <div class="card acc">
 <h4>Why rebase, not merge?</h4>
-<p class="small">Your branch stays a straight line of <em>your</em> commits on top of the current <code>devel</code>. Reviewers see only your change, the history has no &quot;Merge branch 'devel' into …&quot; noise, and conflicts are resolved once, commit by commit.</p>
+<p class="small"><strong>Before review</strong>, your branch stays a straight line of <em>your</em> commits on top of the current <code>devel</code>. <strong>Once reviewers have commented</strong>, <code>DEVELOPMENT.md</code> asks you to merge <code>devel</code> in instead: a rebase rewrites the commits they already read.</p>
 </div>
 
 <div class="card">
@@ -997,7 +996,7 @@ Force-pushing is only for <strong>your own feature branch</strong>. Never force-
 <li><strong>All review threads resolved</strong> before merge.</li>
 </ul>
 <div class="callout good">
-<strong>Recommended rhythm</strong><br>① Rebase onto <code>upstream/devel</code> and tidy <em>before</em> requesting review.<br>② During review, push <strong>new commits</strong> that address comments, so reviewers see the delta.<br>③ Rebase once more only if <code>devel</code> moved and there are conflicts, then ask for a final approval.</div>
+<strong>The rhythm in <code>DEVELOPMENT.md</code></strong><br>① Rebase onto <code>upstream/devel</code> freely and tidy <em>before</em> review starts.<br>② Once reviewers have commented, push <strong>new commits</strong>, and <strong>merge</strong> <code>devel</code> in rather than force-pushing a rebase.<br>③ Must force-push anyway? <code>--force-with-lease</code>, and say so in the PR.</div>
 
 </div>
 <div class="col">
@@ -1012,7 +1011,7 @@ Force-pushing is only for <strong>your own feature branch</strong>. Never force-
 <tbody>
 <tr>
 <td>prometheus_core</td>
-<td>merge commit, squash, rebase</td>
+<td><strong>merge commit</strong> (every branch commit lands in <code>devel</code>)</td>
 </tr>
 <tr>
 <td>your team repo</td>
@@ -1020,7 +1019,7 @@ Force-pushing is only for <strong>your own feature branch</strong>. Never force-
 </tr>
 </tbody>
 </table>
-<p class="small">In practice most PRs land as <strong>merge commits</strong> (&quot;Merge pull request #N from …&quot;). A rebased feature branch makes that merge commit clean: the history shows your commits intact, followed by one merge.</p>
+<p class="small">So squash &quot;fix typo&quot; and &quot;address review&quot; commits into the commit they fix <strong>before approval</strong>: the history that lands on <code>devel</code> should read cleanly.</p>
 </div>
 </div>
 
@@ -1075,11 +1074,11 @@ Avoid: <code>wip</code>, <code>fix</code>, <code>changes</code>, <code>address c
 <tr class="hl">
 <td><strong>Your generated agent</strong></td>
 <td><code>uv run pytest &amp;&amp; uv run ruff check .</code></td>
-<td>The template ships 2 tests with mocked <code>RequestContext</code> and <code>EventQueue</code>.</td>
+<td>The template's tests use mocked <code>RequestContext</code> and <code>EventQueue</code>, and check that your card loads.</td>
 </tr>
 <tr>
 <td><strong><code>platform/</code></strong> infra</td>
-<td><code>make test-static</code></td>
+<td><code>make test-static</code> and <code>make check-markings</code></td>
 <td>No Docker needed. <code>make test-integration</code> and <code>make test-system</code> need the stack running.</td>
 </tr>
 <tr>
@@ -1102,6 +1101,11 @@ Avoid: <code>wip</code>, <code>fix</code>, <code>changes</code>, <code>address c
 <td><code>make check &amp;&amp; make test</code></td>
 <td>Tests <code>setup_agent.py</code> itself.</td>
 </tr>
+<tr>
+<td><strong>Any <code>pyproject.toml</code> change</strong></td>
+<td><code>uv lock</code>, commit <code>uv.lock</code></td>
+<td>CI runs <code>uv lock --check</code>; agent builds fail on a missing or stale lockfile. New <code>.py</code>/<code>.ts</code> files: <code>python3 platform/scripts/add_markings.py</code>.</td>
+</tr>
 </tbody>
 </table>
 <div class="callout warn">
@@ -1116,7 +1120,7 @@ Your team repo has <strong>no CI</strong>: these local checks are all there is. 
 <div class="grid g2" style="gap:30px;">
 <div class="col">
 <h4 class="acc">prometheus_core · <code>.github/workflows/</code></h4>
-<p class="small">On GitHub-hosted runners, for PRs to <code>devel</code> and <code>main</code>:</p>
+<p class="small">On GitHub-hosted runners, for PRs to <code>devel</code> and <code>main</code> and the merge queue:</p>
 <table class="t sm">
 <thead>
 <tr>
@@ -1127,11 +1131,15 @@ Your team repo has <strong>no CI</strong>: these local checks are all there is. 
 <tbody>
 <tr>
 <td><code>test.yml</code></td>
-<td>gitleaks (no secrets in the new commits), ruff, SDK pytest on Python 3.12–3.14, SDK and platform Docker builds, backend and frontend checks</td>
+<td>gitleaks, ruff, copyright markings, <code>uv lock --check</code>, image pins, hadolint + shellcheck, SDK/template/agent/backend/frontend tests, Docker builds, <code>compose config</code>, a full <code>make up</code>, slides up to date</td>
 </tr>
 <tr>
-<td><code>docs.yml</code></td>
-<td>builds the docs site</td>
+<td><code>lint-workflows.yml</code></td>
+<td>actionlint + zizmor on <code>.github/</code> changes</td>
+</tr>
+<tr>
+<td>codecov</td>
+<td><strong>100% of changed lines covered</strong>, project coverage may not drop</td>
 </tr>
 </tbody>
 </table>
@@ -1160,7 +1168,7 @@ Your team repo has <strong>no CI</strong>: these local checks are all there is. 
 </div>
 
   </div>
-  <aside class="notes">test.yml is on the actions branch of prometheus_core and lands on devel with the CI change.</aside>
+  <aside class="notes">The merge_group trigger exists in test.yml; whether the merge queue is switched on is a branch setting. Uncovered changed lines are annotated inline in the PR diff.</aside>
 </section>
 
 <section class="slide appendix">
@@ -1177,7 +1185,7 @@ Your team repo has <strong>no CI</strong>: these local checks are all there is. 
 <tbody>
 <tr class="hl">
 <td><strong>prometheus_core <code>devel</code></strong></td>
-<td>the maintainers, after review</td>
+<td>maintainers, once CI passes and a <strong>code owner</strong> approves</td>
 <td>fork, then a PR to <code>idaholab:devel</code></td>
 </tr>
 <tr>
@@ -1204,43 +1212,44 @@ Your team repo has <strong>no CI</strong>: these local checks are all there is. 
 </div>
 
 <div class="card">
-<h4>No PR templates</h4>
-<p class="small">There is no template, so use the structure on the next slide.</p>
+<h4>Reviewers and template</h4>
+<p class="small">prometheus_core requests reviewers from <code>CODEOWNERS</code> and pre-fills a PR template (next slide). Your team repo has neither.</p>
 </div>
 
 </div>
 
   </div>
-  <aside class="notes">Branch protection on prometheus_core devel is not configured yet; describe it as the working agreement.</aside>
+  <aside class="notes">CONTRIBUTING.md: &quot;Reviewers are requested automatically from CODEOWNERS ... merged once CI passes and a code owner approves it.&quot; /hackathon/ and /agent-template/ are owned by dschwen and maxnezdyur.</aside>
 </section>
 
 <section class="slide appendix">
   <div class="head"><div class="eyebrow">Opening a PR</div><h2>A description reviewers can act on</h2></div>
   <div class="content">
 <div class="grid" style="grid-template-columns: 1.3fr 1fr; gap:30px;">
-<pre class="sm">JIRA: PPLT-123
+<pre class="sm">refs PPLT-123
 
-<span class="p">## What</span>
-Add a <span class="s">`mesh_quality_report`</span> skill that reads an
-Exodus artifact and reports scaled Jacobian and
-aspect-ratio histograms.
-
-<span class="p">## Why</span>
+<span class="p">## Reason</span>
 Meshes from <span class="s">`geometry_meshing`</span> go to MOOSE
 unchecked; bad elements fail late.
 
-<span class="p">## How it was tested</span>
-<span class="k">-</span> <span class="s">`uv run pytest`</span> (6 passed), <span class="s">`uv run ruff check .`</span>
-<span class="k">-</span> Local platform: &quot;check the mesh I just made&quot;
-  routes to the skill; report artifact renders.
+<span class="p">## Design</span>
+A <span class="s">`mesh_quality_report`</span> skill reads an Exodus
+artifact and reports scaled Jacobian and
+aspect-ratio histograms.
 
-<span class="p">## Config / environment changes</span>
+<span class="p">## Impact</span>
 <span class="k">-</span> New env var <span class="s">`MESHQA_MAX_ELEMENTS`</span> (default 2e6)
-<span class="k">-</span> Needs a rebuild of prometheus_api:local (SDK change)</pre>
+<span class="k">-</span> Tested: <span class="s">`uv run pytest`</span> (6 passed), ruff; chat
+  &quot;check the mesh I just made&quot; → report renders.
+
+<span class="p">## Checklist / AI assistance</span>
+<span class="k">- [x]</span> targets devel, one logical change …
+<span class="k">- [x]</span> AI tools were used: Claude Code, tests</pre>
 <div class="col">
 <ul class="b">
 <li><strong>Title</strong>: an imperative sentence, like the commit subject (&quot;Add…&quot;, &quot;Fix…&quot;, &quot;Stop…&quot;).</li>
-<li><strong>Reference the JIRA task</strong> (<code>PPLT-…</code>) at the top of the description.</li>
+<li><strong>Reference the issue or JIRA task</strong> (<code>refs #123</code>, <code>closes #123</code>, <code>PPLT-…</code>).</li>
+<li><code>.github/PULL_REQUEST_TEMPLATE.md</code> pre-fills <strong>Reason / Design / Impact</strong>, a checklist, and an <strong>AI assistance</strong> box: you remain responsible for every line.</li>
 <li><strong>Small and focused.</strong> One topic. Split refactors from behavior changes.</li>
 </ul>
 </div>
@@ -1282,7 +1291,8 @@ gh pr ready               <span class="c"># draft → ready</span></pre>
 <li>Reply to <strong>every</strong> thread. &quot;Fixed in 8e46a68: …&quot; with the commit SHA and a sentence of explanation.</li>
 <li>Disagree with reasons. Maintainers push back too, sometimes with a table of cases.</li>
 <li>Resolve threads only when the reviewer is satisfied, or after replying.</li>
-<li>Accepted a GitHub suggestion in the web UI? <code>git pull --rebase</code> before your next push.</li>
+<li>Accepted a GitHub suggestion in the web UI? <code>git pull</code> before your next push.</li>
+<li><code>devel</code> moved during review? Merge it in; don't force-push a rebase.</li>
 </ul>
 </div>
 
